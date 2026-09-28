@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบนิเทศ ติดตามการวิจัยในชั้นเรียน (Jamovi) - ศธจ.เชียงใหม่</title>
+  
+  <!-- CSS Framework & Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Sarabun', 'sans-serif'],
+            display: ['Prompt', 'Sarabun', 'sans-serif'],
+          },
+          colors: {
+            primary: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              600: '#0284c7',
+              800: '#075985',
+              900: '#0c4a6e',
+              950: '#082f49'
+            },
+            academic: {
+              navy: '#0f172a',
+              blue: '#1e3a8a',
+              accent: '#d97706',
+              emerald: '#047857'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; }
+    .font-display { font-family: 'Prompt', sans-serif; }
+    .glass-nav { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); }
+    .card-academic { transition: all 0.2s ease-in-out; }
+    .card-academic:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04); }
+    .badge-status { font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.65rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.35rem; }
+    @media print {
+      header, footer, .no-print, .tab-btn, button { display: none !important; }
+      body { background: white !important; font-size: 12pt; }
+      .print-only { display: block !important; }
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col justify-between antialiased selection:bg-blue-100 selection:text-blue-900">
+
+  <!-- ==================== HEADER ==================== -->
+  <header class="glass-nav text-white shadow-lg sticky top-0 z-40 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex justify-between items-center">
+      
+      <!-- ตราสัญลักษณ์ & ชื่อระบบ -->
+      <div class="flex items-center space-x-3.5">
+        <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-400 to-amber-300 text-slate-950 flex items-center justify-center font-bold text-xl shadow-md ring-2 ring-amber-400/30">
+          <i class="fa-solid fa-square-poll-vertical"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-sm sm:text-base font-display font-bold leading-tight tracking-tight text-white">
+              ระบบนิเทศ ติดตามการวิจัยในชั้นเรียน (Jamovi)
+            </h1>
+            <span class="hidden md:inline-block px-2 py-0.5 text-[10px] font-semibold bg-blue-900/80 text-blue-200 border border-blue-700/60 rounded">ระยะที่ 2</span>
+          </div>
+          <p class="text-[11px] sm:text-xs text-slate-300 flex items-center gap-1.5">
+            <span>กลุ่มนิเทศ ติดตามและประเมินผล สำนักงานศึกษาธิการจังหวัดเชียงใหม่</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- สิทธิ์ / ผู้ใช้งาน & ปุ่มออกจากระบบ -->
+      <div id="userInfoHeader" class="hidden flex items-center space-x-3 sm:space-x-4">
+        <button onclick="openStatGuideModal()" title="คู่มือสถิติ Jamovi ฉบับย่อ" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 rounded-xl transition">
+          <i class="fa-solid fa-lightbulb text-amber-400"></i> คู่มือสถิติ Jamovi
+        </button>
+        <div class="text-right hidden sm:block">
+          <p id="headerName" class="text-xs sm:text-sm font-semibold text-white leading-tight"></p>
+          <div class="flex items-center justify-end gap-1.5 mt-0.5">
+            <span id="headerSchool" class="text-[11px] text-amber-300"></span>
+            <span id="headerRoleBadge" class="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-slate-700 text-slate-200"></span>
+          </div>
+        </div>
+        <button onclick="logout()" class="text-xs bg-rose-600/90 hover:bg-rose-600 text-white px-3.5 py-1.5 rounded-xl border border-rose-400/50 shadow-sm transition flex items-center gap-1.5 font-medium">
+          <i class="fa-solid fa-power-off"></i> <span class="hidden sm:inline">ออกจากระบบ</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- แจ้งเตือนรหัสเริ่มต้น (Security Alert) -->
+  <div id="defaultPassNotice" class="hidden bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-white text-xs sm:text-sm py-2 px-4 text-center font-medium shadow-inner flex items-center justify-center gap-2">
+    <i class="fa-solid fa-shield-halved text-white animate-pulse"></i>
+    <span>ท่านกำลังใช้งานรหัสผ่านเริ่มต้น (<strong class="underline">1234</strong>) เพื่อความปลอดภัย โปรดคลิกที่แท็บ <strong>"ข้อมูลส่วนตัว & รหัสผ่าน"</strong> เพื่อตั้งรหัสผ่านใหม่</span>
+  </div>
+
+  <!-- ==================== LOGIN SECTION ==================== -->
+  <main id="loginSection" class="flex-1 flex items-center justify-center p-4 sm:p-6 my-auto">
+    <div class="bg-white p-7 sm:p-10 rounded-3xl shadow-2xl border border-slate-200/80 max-w-md w-full relative overflow-hidden">
+      <div class="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-900 via-indigo-700 to-amber-500"></div>
+      
+      <div class="text-center mb-7">
+        <div class="w-16 h-16 bg-blue-50 text-blue-900 rounded-2xl flex items-center justify-center mx-auto mb-3.5 text-2xl border border-blue-100 shadow-sm">
+          <i class="fa-solid fa-chart-pie text-blue-800"></i>
+        </div>
+        <h2 class="text-lg sm:text-xl font-display font-bold text-slate-900">เข้าสู่ระบบนิเทศติดตาม</h2>
+        <p class="text-xs sm:text-sm text-slate-500 mt-1">การประยุกต์ใช้โปรแกรม Jamovi สำหรับการวิจัยในชั้นเรียน</p>
+        <p class="text-[11px] text-blue-800 font-semibold mt-0.5">สำนักงานศึกษาธิการจังหวัดเชียงใหม่</p>
+      </div>
+
+      <form onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5">รหัสผู้ใช้งาน (Username เช่น T01–T48, supervisor01...)</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+              <i class="fa-solid fa-user-tie"></i>
+            </span>
+            <input type="text" id="loginUser" required placeholder="กรอก Username ของท่าน" class="w-full pl-9 pr-3 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition bg-slate-50/50 focus:bg-white">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5">รหัสผ่าน (Password ตั้งต้น: 1234)</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+              <i class="fa-solid fa-lock"></i>
+            </span>
+            <input type="password" id="loginPass" required placeholder="กรอกรหัสผ่าน" class="w-full pl-9 pr-3 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition bg-slate-50/50 focus:bg-white">
+          </div>
+        </div>
+
+        <button type="submit" id="loginBtn" class="w-full bg-gradient-to-r from-blue-900 to-indigo-900 hover:from-blue-800 hover:to-indigo-800 text-white font-semibold py-3 rounded-xl shadow-lg transition duration-150 flex items-center justify-center gap-2 text-xs sm:text-sm mt-2">
+          <span>เข้าสู่ระบบ</span> <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </form>
+
+      <div class="mt-6 pt-5 border-t border-slate-100 text-center">
+        <p class="text-[11px] text-slate-400">
+          มีปัญหาการเข้าสู่ระบบ ติดต่อ ศน.รัชภูมิ สมสมัย โทร. 085-6536564
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <!-- ==================== PORTAL SECTION ==================== -->
+  <main id="portalSection" class="hidden flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+
+    <!-- แถบสถิติภาพรวมเชิงวิชาการ (Academic KPI Dashboard) -->
+    <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5" id="dashboardStats">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-800 flex items-center justify-center text-lg"><i class="fa-solid fa-list-check"></i></div>
+        <div>
+          <p class="text-[11px] text-slate-500 font-medium">ภารกิจที่มอบหมาย</p>
+          <h4 class="text-base sm:text-lg font-bold text-slate-800" id="statAssignments">0</h4>
+        </div>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-800 flex items-center justify-center text-lg"><i class="fa-solid fa-paper-plane"></i></div>
+        <div>
+          <p class="text-[11px] text-slate-500 font-medium">ส่งผลงานแล้ว</p>
+          <h4 class="text-base sm:text-lg font-bold text-slate-800" id="statSubmissions">0</h4>
+        </div>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center text-lg"><i class="fa-solid fa-circle-check"></i></div>
+        <div>
+          <p class="text-[11px] text-slate-500 font-medium">ผ่านการนิเทศ</p>
+          <h4 class="text-base sm:text-lg font-bold text-emerald-700" id="statPassed">0</h4>
+        </div>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-800 flex items-center justify-center text-lg"><i class="fa-solid fa-arrows-rotate"></i></div>
+        <div>
+          <p class="text-[11px] text-slate-500 font-medium">รอการปรับแก้</p>
+          <h4 class="text-base sm:text-lg font-bold text-rose-600" id="statRevisions">0</h4>
+        </div>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 col-span-2 sm:col-span-1">
+        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-800 flex items-center justify-center text-lg"><i class="fa-solid fa-stethoscope"></i></div>
+        <div>
+          <p class="text-[11px] text-slate-500 font-medium">คลินิกวิจัย & ถาม-ตอบ</p>
+          <h4 class="text-base sm:text-lg font-bold text-amber-700" id="statQA">0</h4>
+        </div>
+      </div>
+    </section>
+
+    <!-- เมนู Tabs หลัก -->
+    <div class="flex flex-wrap gap-2 border-b border-slate-200 pb-3 items-center">
+      <button onclick="switchTab('tab-tasks')" id="btn-tasks" class="tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-blue-900 text-white shadow-md transition flex items-center gap-1.5">
+        <i class="fa-solid fa-list-check"></i> <span>ภารกิจและส่งงาน</span>
+      </button>
+      <button onclick="switchTab('tab-submissions')" id="btn-submissions" class="tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 transition flex items-center gap-1.5">
+        <i class="fa-solid fa-comments"></i> <span>ติดตามผล & ข้อเสนอแนะ</span>
+      </button>
+      <button onclick="switchTab('tab-resources')" id="btn-resources" class="tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 transition flex items-center gap-1.5">
+        <i class="fa-solid fa-book-bookmark"></i> <span>คลังสื่อ & คู่มือ Jamovi</span>
+      </button>
+      <button onclick="switchTab('tab-qa')" id="btn-qa" class="tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 transition flex items-center gap-1.5">
+        <i class="fa-solid fa-circle-question text-emerald-600"></i> <span>คลินิกวิจัย & ถาม-ตอบ</span>
+      </button>
+      <button onclick="switchTab('tab-profile')" id="btn-profile" class="tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 transition flex items-center gap-1.5 ml-auto">
+        <i class="fa-solid fa-id-card text-blue-600"></i> <span>ข้อมูลส่วนตัว & รหัสผ่าน</span>
+      </button>
+    </div>
+
+    <!-- ==================== TAB 1: ภารกิจและการส่งงาน ==================== -->
+    <section id="tab-tasks" class="tab-content space-y-5">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-tasks text-blue-800"></i> รายการภารกิจการวิจัยในชั้นเรียน
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">เลือกภารกิจที่ได้รับมอบหมายเพื่อส่งไฟล์ผลงาน Jamovi (.omv) หรือเล่มรายงานวิจัย</p>
+        </div>
+        <button id="btnOpenNewAssignment" onclick="openNewAssignmentModal()" class="hidden px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold shadow-md flex items-center gap-2 transition">
+          <i class="fa-solid fa-circle-plus"></i> เพิ่มภารกิจใหม่ (แจ้งเตือนครู)
+        </button>
+      </div>
+
+      <!-- การ์ดภารกิจ -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="assignmentCards"></div>
+
+      <!-- ฟอร์มส่งงานภารกิจ (ครั้งแรก) -->
+      <div id="submitModal" class="hidden bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-2xl max-w-2xl mx-auto space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+          <div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800 uppercase">ส่งผลงานวิจัย</span>
+            <h3 class="text-sm sm:text-base font-bold text-slate-900 mt-1">
+              ภารกิจ: <span id="targetTaskTitle" class="text-blue-900 font-semibold"></span>
+            </h3>
+          </div>
+          <button onclick="closeSubmitForm()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold">&times;</button>
+        </div>
+
+        <form onsubmit="handleAssignmentSubmit(event)" class="space-y-4 text-xs sm:text-sm">
+          <input type="hidden" id="subTaskId">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">ชื่องานวิจัยในชั้นเรียน <span class="text-rose-600">*</span></label>
+            <input type="text" id="subResearchTitle" required placeholder="เช่น การพัฒนาผลสัมฤทธิ์ทางการเรียนวิชาวิทยาศาสตร์โดยใช้การจัดการเรียนรู้แบบสืบเสาะ..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">อัปโหลดไฟล์ผลงาน (.omv ไฟล์ Jamovi, .pdf หรือ .docx)</label>
+            <input type="file" id="subFileInput" class="w-full text-xs text-slate-600 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-slate-200 rounded-xl p-1 bg-slate-50/50">
+            <p class="text-[11px] text-slate-400 mt-1">แนะนำ: แนบไฟล์ข้อมูล Jamovi (.omv) หรือรายงานผลสรุป</p>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">หรือแนบลิงก์ Google Drive / Cloud Link (ถ้ามี)</label>
+            <input type="url" id="subFileLink" placeholder="https://drive.google.com/..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">ข้อความสะท้อนคิดของครู (Teacher Reflection) / ข้อคำถามเพิ่มเติม</label>
+            <textarea id="subReflection" rows="3" placeholder="ระบุสิ่งที่ได้เรียนรู้จากการใช้โปรแกรม Jamovi ปัญหาที่พบ หรือประเด็นที่ขอรับการนิเทศเพิ่มเติม..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none"></textarea>
+          </div>
+          <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <button type="button" onclick="closeSubmitForm()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold">ยกเลิก</button>
+            <button type="submit" id="btnUploadSubmit" class="px-6 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-semibold flex items-center gap-2 shadow-md">
+              <i class="fa-solid fa-paper-plane"></i> ยืนยันการส่งงาน
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Modal เพิ่มภารกิจใหม่ (เฉพาะ ศน./Admin) -->
+      <div id="newAssignmentModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full border border-slate-200 shadow-2xl space-y-4">
+          <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-circle-plus text-emerald-600"></i> มอบหมายภารกิจการวิจัยใหม่
+            </h3>
+            <button onclick="closeNewAssignmentModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+          </div>
+          <form onsubmit="handleCreateAssignment(event)" class="space-y-3.5 text-xs sm:text-sm">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">รหัสภารกิจ (assignment_id) <span class="text-rose-600">*</span></label>
+                <input type="text" id="newTaskAssignmentId" required placeholder="เช่น TASK-01" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">สถานะภารกิจ (status) <span class="text-rose-600">*</span></label>
+                <select id="newTaskStatus" required class="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-blue-600 outline-none">
+                  <option value="Open">Open (เปิดรับงาน)</option>
+                  <option value="Closed">Closed (ปิดรับงาน)</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">ชื่อภารกิจ (title) <span class="text-rose-600">*</span></label>
+              <input type="text" id="newTaskTitle" required placeholder="เช่น ส่งเค้าโครงการวิจัยและไฟล์สถิติ Jamovi (.omv)" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">คำชี้แจงรายละเอียดภารกิจ (description) <span class="text-rose-600">*</span></label>
+              <textarea id="newTaskDescription" rows="3" required placeholder="ระบุเกณฑ์การจัดทำ ข้อกำหนด และสิ่งที่ต้องส่ง..." class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none"></textarea>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">กำหนดส่ง (due_date) <span class="text-rose-600">*</span></label>
+                <input type="text" id="newTaskDueDate" required placeholder="เช่น 31 ตุลาคม 2569" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">ลิงก์ตัวอย่าง/เทมเพลต (template_link)</label>
+                <input type="url" id="newTaskTemplateLink" placeholder="https://drive.google.com/..." class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+              </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <button type="button" onclick="closeNewAssignmentModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold">ยกเลิก</button>
+              <button type="submit" id="btnSubmitNewTask" class="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-semibold flex items-center gap-2 shadow-md">
+                <i class="fa-solid fa-paper-plane"></i> บันทึกและส่งอีเมลแจ้งเตือน
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: ติดตามผล & ข้อเสนอแนะ ==================== -->
+    <section id="tab-submissions" class="tab-content hidden space-y-4">
+      <div class="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+        
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+          <div>
+            <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-clock-rotate-left text-blue-800"></i> ประวัติการส่งงาน และข้อเสนอแนะเชิงวิชาการจากผู้นิเทศ
+            </h3>
+            <p class="text-xs text-slate-500 mt-0.5">ติดตามสถานะการตรวจ ข้อเสนอแนะเชิงวิชาการ และส่งงานฉบับปรับปรุงแก้ไข</p>
+          </div>
+          
+          <!-- ช่องค้นหาและตัวกรอง -->
+          <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            <input type="text" id="subSearchInput" oninput="filterSubmissions()" placeholder="ค้นหาชื่องานวิจัย / ผู้ส่ง..." class="px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none w-full sm:w-48">
+            <select id="subStatusFilter" onchange="filterSubmissions()" class="px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-blue-600 outline-none">
+              <option value="ALL">ทุกสถานะ</option>
+              <option value="รอตรวจ">รอตรวจ</option>
+              <option value="กำลังนิเทศ">กำลังนิเทศ</option>
+              <option value="ปรับปรุงแก้ไข">ปรับปรุงแก้ไข</option>
+              <option value="ผ่านการนิเทศ">ผ่านการนิเทศ</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-2xl border border-slate-200">
+          <table class="w-full text-left text-xs text-slate-600">
+            <thead class="bg-slate-100 text-slate-700 uppercase font-semibold text-[11px] tracking-wider">
+              <tr>
+                <th class="px-3.5 py-3">วัน-เวลาส่ง</th>
+                <th class="px-3.5 py-3">ผู้ส่ง / สังกัด</th>
+                <th class="px-3.5 py-3">ชื่องานวิจัยในชั้นเรียน</th>
+                <th class="px-3.5 py-3">ไฟล์งาน</th>
+                <th class="px-3.5 py-3">สถานะ</th>
+                <th class="px-3.5 py-3">ข้อเสนอแนะเชิงวิชาการ (ศน.)</th>
+                <th class="px-3.5 py-3 text-right">ดำเนินการ</th>
+              </tr>
+            </thead>
+            <tbody id="submissionTableBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Modal ส่งงานฉบับแก้ไข (Resubmit) -->
+    <div id="resubmitModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full border border-slate-200 shadow-2xl space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+          <h3 class="text-base font-bold text-amber-700 flex items-center gap-2">
+            <i class="fa-solid fa-arrows-rotate"></i> ส่งงานฉบับปรับปรุงแก้ไข
+          </h3>
+          <button onclick="closeResubmitModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+        </div>
+        <form onsubmit="handleResubmit(event)" class="space-y-3.5 text-xs sm:text-sm">
+          <input type="hidden" id="resubRowId">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">ชื่องานวิจัยในชั้นเรียน</label>
+            <input type="text" id="resubResearchTitle" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-amber-500 outline-none">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">อัปโหลดไฟล์ฉบับปรับปรุงใหม่ (.omv / .pdf / .docx)</label>
+            <input type="file" id="resubFileInput" class="w-full text-xs text-slate-600 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-800 hover:file:bg-amber-100 border border-slate-200 rounded-xl p-1 bg-slate-50/50">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">หรือแนบลิงก์ไฟล์ใหม่ (Google Drive)</label>
+            <input type="url" id="resubFileLink" placeholder="https://drive.google.com/..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-amber-500 outline-none">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">บันทึกชี้แจงประเด็นที่ได้ปรับปรุงแก้ไขตามข้อเสนอแนะ <span class="text-rose-600">*</span></label>
+            <textarea id="resubReflection" rows="3" required placeholder="อธิบายจุดที่ได้แก้ไขเพิ่มเติม เช่น แก้ไขค่าสถิติ t-test, เพิ่มผลสัมฤทธิ์..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-amber-500 outline-none"></textarea>
+          </div>
+          <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <button type="button" onclick="closeResubmitModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold">ยกเลิก</button>
+            <button type="submit" id="btnConfirmResubmit" class="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold flex items-center gap-2 shadow-md">
+              <i class="fa-solid fa-paper-plane"></i> ยืนยันการส่งฉบับแก้ไข
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 3: คลังสื่อ & คู่มือ Jamovi ==================== -->
+    <section id="tab-resources" class="tab-content hidden space-y-4">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-book-bookmark text-blue-800"></i> คลังสื่อ คู่มือ และเอกสารการวิจัย Jamovi
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">รวมไฟล์ติดตั้ง โปรแกรมจำลอง ชุดข้อมูลตัวอย่าง และคู่มือภาษาไทย</p>
+        </div>
+        <button id="btnOpenNewResource" onclick="openNewResourceModal()" class="hidden px-4 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-white text-xs font-semibold shadow-md flex items-center gap-2 transition">
+          <i class="fa-solid fa-folder-plus"></i> เพิ่มสื่อ / คู่มือ Jamovi
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="resourceCards"></div>
+
+      <!-- Modal เพิ่มสื่อใหม่ (เฉพาะ ศน./Admin) -->
+      <div id="newResourceModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full border border-slate-200 shadow-2xl space-y-4">
+          <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-folder-plus text-blue-700"></i> เพิ่มสื่อและคู่มือ Jamovi ใหม่
+            </h3>
+            <button onclick="closeNewResourceModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+          </div>
+          <form onsubmit="handleCreateResource(event)" class="space-y-3 text-xs sm:text-sm">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">รหัสสื่อ (resource_id)</label>
+                <input type="text" id="newResId" placeholder="เว้นว่างได้ (ระบบสร้างให้อัตโนมัติ)" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">หมวดหมู่สื่อ (category)</label>
+                <input type="text" id="newResCategory" list="categoryOptions" placeholder="เลือกหรือพิมพ์เอง เช่น คู่มือ, วิดีโอ" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+                <datalist id="categoryOptions">
+                  <option value="คู่มือและโปรแกรม">
+                  <option value="วิดีโอย้อนหลัง">
+                  <option value="ชุดข้อมูลตัวอย่าง (Dataset)">
+                  <option value="สไลด์การบรรยาย">
+                  <option value="ตัวอย่างรายงานวิจัย">
+                </datalist>
+              </div>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">ชื่อสื่อ / หัวข้อเอกสาร (title) <span class="text-rose-600">*</span></label>
+              <input type="text" id="newResTitle" required placeholder="เช่น คู่มือการใช้งาน Jamovi 2.7 ฉบับภาษาไทย" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">คำอธิบายรายละเอียดโดยย่อ (description)</label>
+              <textarea id="newResDesc" rows="2" placeholder="อธิบายเนื้อหาและประโยชน์การนำไปใช้..." class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none"></textarea>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">ลิงก์เข้าดู / ดาวน์โหลด (file_link) <span class="text-rose-600">*</span></label>
+              <input type="url" id="newResLink" required placeholder="https://drive.google.com/... หรือ YouTube Link" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">ลิงก์ภาพหน้าปก / ไอคอน (thumbnail_url)</label>
+                <input type="url" id="newResThumb" placeholder="https://... (เว้นว่างได้)" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">วันที่อัปเดต (updated_date)</label>
+                <input type="text" id="newResDate" placeholder="เช่น 17/10/2569 (เว้นว่างใช้วันนี้)" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+              </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <button type="button" onclick="closeNewResourceModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold">ยกเลิก</button>
+              <button type="submit" id="btnSubmitNewRes" class="px-5 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-semibold flex items-center gap-2 shadow-md">
+                <i class="fa-solid fa-floppy-disk"></i> บันทึกข้อมูลลงคลังสื่อ
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 4: คลินิกวิจัย & ถาม-ตอบ ==================== -->
+    <section id="tab-qa" class="tab-content hidden space-y-4">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-stethoscope text-emerald-600"></i> คลินิกวิจัยและข้อซักถาม Jamovi
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">ปรึกษาปัญหาการคำนวณสถิติ ปัญหาการตั้งค่าตัวแปร หรือระเบียบวิธีวิจัยในชั้นเรียน</p>
+        </div>
+        <button onclick="openQuestionModal()" class="text-xs bg-emerald-700 hover:bg-emerald-600 text-white font-semibold px-4 py-2.5 rounded-xl shadow-md flex items-center gap-2 transition">
+          <i class="fa-solid fa-plus-circle"></i> ตั้งกระทู้คำถาม (แจ้งเตือน ศน.)
+        </button>
+      </div>
+
+      <div class="space-y-3.5" id="qaListContainer"></div>
+    </section>
+
+    <!-- ==================== TAB 5: ข้อมูลส่วนตัว & รหัสผ่าน ==================== -->
+    <section id="tab-profile" class="tab-content hidden space-y-5">
+      <div class="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-md">
+        <div class="border-b border-slate-200 pb-4 mb-5 flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-user-gear text-blue-800"></i> จัดการข้อมูลส่วนตัวและรหัสผ่าน
+            </h3>
+            <p class="text-xs text-slate-500 mt-0.5">ท่านสามารถเปลี่ยน Username, Password และปรับปรุงข้อมูลให้เป็นปัจจุบันได้ตลอดเวลา</p>
+          </div>
+          <span id="profileRoleBadge" class="text-xs font-bold px-3 py-1 rounded-lg bg-blue-100 text-blue-800"></span>
+        </div>
+
+        <form onsubmit="handleProfileUpdate(event)" class="space-y-4 text-xs sm:text-sm">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">ชื่อผู้ใช้งาน (Username) <span class="text-rose-600">*</span></label>
+              <input type="text" id="profUsername" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">รหัสผ่านใหม่ (เว้นว่างไว้หากไม่ต้องการเปลี่ยน)</label>
+              <input type="password" id="profNewPass" placeholder="กรอกรหัสผ่านใหม่" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">ชื่อ - สกุล <span class="text-rose-600">*</span></label>
+              <input type="text" id="profFullName" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">อีเมลติดต่อ (รับการแจ้งเตือน) <span class="text-rose-600">*</span></label>
+              <input type="email" id="profEmail" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">สถานศึกษา / สังกัด <span class="text-rose-600">*</span></label>
+              <input type="text" id="profSchool" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">กลุ่มสาระการเรียนรู้</label>
+              <input type="text" id="profSubject" placeholder="เช่น วิทยาศาสตร์และเทคโนโลยี" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+            </div>
+          </div>
+          <div class="pt-4 border-t border-slate-100 flex justify-end">
+            <button type="submit" id="btnSaveProfile" class="px-6 py-2.5 bg-blue-900 hover:bg-blue-800 text-white font-semibold rounded-xl shadow-md transition flex items-center gap-2">
+              <i class="fa-solid fa-floppy-disk"></i> บันทึกการเปลี่ยนแปลงข้อมูล
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== STATISTICAL CHEATSHEET MODAL ==================== -->
+  <div id="statGuideModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full border border-slate-200 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-graduation-cap text-blue-700"></i> คู่มือสรุปการเลือกใช้สถิติใน Jamovi สำหรับวิจัยในชั้นเรียน
+        </h3>
+        <button onclick="closeStatGuideModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+      </div>
+      
+      <div class="space-y-3 text-xs sm:text-sm text-slate-700">
+        <div class="bg-blue-50/70 p-3.5 rounded-xl border-l-4 border-blue-600">
+          <h4 class="font-bold text-blue-900">1. Paired Samples t-test (เปรียบเทียบก่อน-หลังเรียนในกลุ่มเดิม)</h4>
+          <p class="text-xs text-slate-600 mt-1">ใช้เมื่อ: วัดผลสัมฤทธิ์ทางการเรียน Pre-test vs Post-test ของนักเรียนห้องเดียวกัน</p>
+          <p class="text-[11px] text-blue-800 font-mono mt-1">เมนู: Analyses &gt; T-Tests &gt; Paired Samples T-Test</p>
+        </div>
+
+        <div class="bg-emerald-50/70 p-3.5 rounded-xl border-l-4 border-emerald-600">
+          <h4 class="font-bold text-emerald-900">2. Independent Samples t-test (เปรียบเทียบ 2 กลุ่มอิสระ)</h4>
+          <p class="text-xs text-slate-600 mt-1">ใช้เมื่อ: เปรียบเทียบผลการเรียนระหว่างกลุ่มทดลอง (นวัตกรรม) กับกลุ่มควบคุม (ปกติ)</p>
+          <p class="text-[11px] text-emerald-800 font-mono mt-1">เมนู: Analyses &gt; T-Tests &gt; Independent Samples T-Test</p>
+        </div>
+
+        <div class="bg-indigo-50/70 p-3.5 rounded-xl border-l-4 border-indigo-600">
+          <h4 class="font-bold text-indigo-900">3. One-Way ANOVA (เปรียบเทียบตั้งแต่ 3 กลุ่มขึ้นไป)</h4>
+          <p class="text-xs text-slate-600 mt-1">ใช้เมื่อ: เปรียบเทียบผลสัมฤทธิ์ระหว่างห้องเรียนตั้งแต่ 3 ห้อง หรือวิธีการสอน 3 รูปแบบ</p>
+          <p class="text-[11px] text-indigo-800 font-mono mt-1">เมนู: Analyses &gt; ANOVA &gt; One-Way ANOVA</p>
+        </div>
+
+        <div class="bg-amber-50/70 p-3.5 rounded-xl border-l-4 border-amber-600">
+          <h4 class="font-bold text-amber-900">4. Reliability Analysis (ความเชื่อมั่นแบบสอบถาม/แบบทดสอบ)</h4>
+          <p class="text-xs text-slate-600 mt-1">ใช้เมื่อ: หาค่าความเชื่อมั่นสัมประสิทธิ์แอลฟาของครอนบาค (Cronbach's Alpha &ge; 0.70)</p>
+          <p class="text-[11px] text-amber-800 font-mono mt-1">เมนู: Analyses &gt; Factor &gt; Reliability Analysis</p>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 text-right">
+        <button onclick="closeStatGuideModal()" class="px-5 py-2 rounded-xl bg-blue-900 text-white font-semibold text-xs">เข้าใจแล้ว</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+      <p>กลุ่มนิเทศ ติดตามและประเมินผล สำนักงานศึกษาธิการจังหวัดเชียงใหม่</p>
+      <p class="text-[11px] text-slate-400">ผู้ประสานงาน: ศน.รัชภูมิ สมสมัย โทร. 085-6536564</p>
+    </div>
+  </footer>
+
+  <!-- ==================== JAVASCRIPT CORE ==================== -->
+  <script>
+    // 🌐 ตัวแปร Configuration สำหรับเชื่อมต่อ Google Apps Script Web App เมื่อรันภายนอก (เช่น Vercel)
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwO4WvI5p7C7YxZ2YJ_w7gP1x8Kq_Example/exec"; // ระบุ URL Web App ของ Apps Script
+
+    let currentUser = null;
+    let systemData = { assignments: [], submissions: [], resources: [], qaBoard: [] };
+
+    window.onload = function() {
+      const savedUser = localStorage.getItem('jamovi_mentoring_user');
+      if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        showPortal();
+      }
+    };
+
+    /**
+     * Unified Backend Bridge:
+     * รันผ่าน google.script.run เมื่ออยู่ใน GAS หรือ fetch API เมื่อรันบน Vercel/GitHub
+     */
+    function callBackend(actionName, payload = {}) {
+      return new Promise((resolve, reject) => {
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+          google.script.run
+            .withSuccessHandler(res => resolve(res))
+            .withFailureHandler(err => reject(err))
+            [actionName](payload);
+        } else {
+          // โหมด External Hosting (Vercel / GitHub Pages)
+          const dataToSend = { action: actionName, ...payload };
+          fetch(GAS_API_URL, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(dataToSend)
+          })
+          .then(r => r.json())
+          .then(res => resolve(res))
+          .catch(err => {
+            console.warn("API call fallback or offline:", err);
+            reject(err);
+          });
+        }
+      });
+    }
+
+    // เข้าสู่ระบบ
+    function handleLogin(e) {
+      e.preventDefault();
+      const u = document.getElementById('loginUser').value.trim();
+      const p = document.getElementById('loginPass').value.trim();
+      const btn = document.getElementById('loginBtn');
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังตรวจสอบสิทธิ์...';
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(res => handleLoginResponse(res, btn))
+          .withFailureHandler(err => handleLoginError(err, btn))
+          .loginUser(u, p);
+      } else {
+        callBackend('login', { username: u, password: p })
+          .then(res => handleLoginResponse(res, btn))
+          .catch(err => handleLoginError(err, btn));
+      }
+    }
+
+    function handleLoginResponse(res, btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>เข้าสู่ระบบ</span> <i class="fa-solid fa-arrow-right"></i>';
+      if (res && res.success) {
+        currentUser = res.user;
+        localStorage.setItem('jamovi_mentoring_user', JSON.stringify(currentUser));
+        showPortal();
+      } else {
+        Swal.fire({ icon: 'error', title: 'เข้าสู่ระบบไม่สำเร็จ', text: res ? res.message : 'เกิดข้อผิดพลาด', confirmButtonColor: '#0f172a' });
+      }
+    }
+
+    function handleLoginError(err, btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>เข้าสู่ระบบ</span> <i class="fa-solid fa-arrow-right"></i>';
+      Swal.fire({ icon: 'error', title: 'ข้อผิดพลาดระบบ', text: err.toString(), confirmButtonColor: '#0f172a' });
+    }
+
+    function showPortal() {
+      document.getElementById('loginSection').classList.add('hidden');
+      document.getElementById('portalSection').classList.remove('hidden');
+      document.getElementById('userInfoHeader').classList.remove('hidden');
+      document.getElementById('headerName').textContent = currentUser.fullName;
+      document.getElementById('headerSchool').textContent = currentUser.schoolName;
+      document.getElementById('headerRoleBadge').textContent = currentUser.role;
+
+      const isManager = (currentUser.role === 'supervisor' || currentUser.role === 'admin');
+      
+      const btnNewTask = document.getElementById('btnOpenNewAssignment');
+      if (isManager) btnNewTask.classList.remove('hidden');
+      else btnNewTask.classList.add('hidden');
+
+      const btnNewRes = document.getElementById('btnOpenNewResource');
+      if (isManager) btnNewRes.classList.remove('hidden');
+      else btnNewRes.classList.add('hidden');
+
+      if (currentUser.isDefaultPass) {
+        document.getElementById('defaultPassNotice').classList.remove('hidden');
+      } else {
+        document.getElementById('defaultPassNotice').classList.add('hidden');
+      }
+
+      fillProfileForm();
+      loadSystemData();
+    }
+
+    function fillProfileForm() {
+      document.getElementById('profUsername').value = currentUser.username;
+      document.getElementById('profFullName').value = currentUser.fullName;
+      document.getElementById('profSchool').value = currentUser.schoolName;
+      document.getElementById('profSubject').value = currentUser.subjectGroup || '';
+      document.getElementById('profEmail').value = currentUser.email || '';
+      document.getElementById('profNewPass').value = '';
+      document.getElementById('profileRoleBadge').textContent = 'สิทธิ์: ' + currentUser.role;
+    }
+
+    function handleProfileUpdate(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSaveProfile');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...';
+
+      const payload = {
+        currentUsername: currentUser.username,
+        newUsername: document.getElementById('profUsername').value.trim(),
+        newPassword: document.getElementById('profNewPass').value.trim(),
+        fullName: document.getElementById('profFullName').value.trim(),
+        schoolName: document.getElementById('profSchool').value.trim(),
+        subjectGroup: document.getElementById('profSubject').value.trim(),
+        email: document.getElementById('profEmail').value.trim()
+      };
+
+      const afterUpdate = (res) => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> บันทึกการเปลี่ยนแปลงข้อมูล';
+        if (res.success) {
+          currentUser.username = res.updatedUser.username;
+          currentUser.fullName = res.updatedUser.fullName;
+          currentUser.schoolName = res.updatedUser.schoolName;
+          currentUser.subjectGroup = res.updatedUser.subjectGroup;
+          currentUser.email = res.updatedUser.email;
+          if (payload.newPassword) {
+            currentUser.isDefaultPass = false;
+            document.getElementById('defaultPassNotice').classList.add('hidden');
+          }
+          localStorage.setItem('jamovi_mentoring_user', JSON.stringify(currentUser));
+          document.getElementById('headerName').textContent = currentUser.fullName;
+          document.getElementById('headerSchool').textContent = currentUser.schoolName;
+
+          Swal.fire({ icon: 'success', title: 'สำเร็จ', text: res.message, confirmButtonColor: '#0f172a' });
+          fillProfileForm();
+        } else {
+          Swal.fire({ icon: 'error', title: 'ไม่สามารถบันทึกได้', text: res.message, confirmButtonColor: '#0f172a' });
+        }
+      };
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(afterUpdate)
+          .withFailureHandler(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> บันทึกการเปลี่ยนแปลงข้อมูล';
+            Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: err.toString(), confirmButtonColor: '#0f172a' });
+          })
+          .updateUserProfile(payload);
+      } else {
+        callBackend('updateUserProfile', payload).then(afterUpdate).catch(err => {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> บันทึกการเปลี่ยนแปลงข้อมูล';
+          Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: err.toString(), confirmButtonColor: '#0f172a' });
+        });
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('jamovi_mentoring_user');
+      currentUser = null;
+      systemData = { assignments: [], submissions: [], resources: [], qaBoard: [] };
+
+      document.getElementById('loginPass').value = '';
+      document.getElementById('loginUser').value = '';
+
+      document.getElementById('portalSection').classList.add('hidden');
+      document.getElementById('userInfoHeader').classList.add('hidden');
+      document.getElementById('defaultPassNotice').classList.add('hidden');
+      document.getElementById('loginSection').classList.remove('hidden');
+
+      switchTab('tab-tasks');
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-blue-900', 'text-white', 'shadow-md');
+        btn.classList.add('bg-white', 'text-slate-700');
+      });
+
+      document.getElementById(tabId).classList.remove('hidden');
+      const activeBtn = document.getElementById('btn-' + tabId.replace('tab-', ''));
+      if (activeBtn) {
+        activeBtn.classList.remove('bg-white', 'text-slate-700');
+        activeBtn.classList.add('bg-blue-900', 'text-white', 'shadow-md');
+      }
+    }
+
+    function loadSystemData() {
+      const handleData = (res) => {
+        if (res && res.success) {
+          systemData = res;
+          updateDashboardStats();
+          renderTasks(res.assignments);
+          renderSubmissions(res.submissions);
+          renderResources(res.resources);
+          renderQA(res.qaBoard);
+        }
+      };
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(handleData)
+          .getInitialData(currentUser.username, currentUser.role);
+      } else {
+        callBackend('getInitialData', { username: currentUser.username, role: currentUser.role })
+          .then(handleData);
+      }
+    }
+
+    function updateDashboardStats() {
+      document.getElementById('statAssignments').textContent = (systemData.assignments || []).length;
+      document.getElementById('statSubmissions').textContent = (systemData.submissions || []).length;
+      const passedCount = (systemData.submissions || []).filter(s => s.status === 'ผ่านการนิเทศ').length;
+      const revisionCount = (systemData.submissions || []).filter(s => s.status === 'ปรับปรุงแก้ไข').length;
+      document.getElementById('statPassed').textContent = passedCount;
+      document.getElementById('statRevisions').textContent = revisionCount;
+      document.getElementById('statQA').textContent = (systemData.qaBoard || []).length;
+    }
+
+    function openNewAssignmentModal() { document.getElementById('newAssignmentModal').classList.remove('hidden'); }
+    function closeNewAssignmentModal() { document.getElementById('newAssignmentModal').classList.add('hidden'); }
+
+    function handleCreateAssignment(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSubmitNewTask');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึกและส่งอีเมลแจ้งครู...';
+
+      const payload = {
+        assignment_id: document.getElementById('newTaskAssignmentId').value.trim(),
+        title: document.getElementById('newTaskTitle').value.trim(),
+        description: document.getElementById('newTaskDescription').value.trim(),
+        due_date: document.getElementById('newTaskDueDate').value.trim(),
+        template_link: document.getElementById('newTaskTemplateLink').value.trim(),
+        status: document.getElementById('newTaskStatus').value
+      };
+
+      const afterCreate = (res) => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> บันทึกและส่งอีเมลแจ้งเตือน';
+        if (res.success) {
+          Swal.fire({ icon: 'success', title: 'เพิ่มภารกิจสำเร็จ', text: res.message, confirmButtonColor: '#0f172a' });
+          closeNewAssignmentModal();
+          document.getElementById('newTaskAssignmentId').value = '';
+          document.getElementById('newTaskTitle').value = '';
+          document.getElementById('newTaskDescription').value = '';
+          document.getElementById('newTaskDueDate').value = '';
+          document.getElementById('newTaskTemplateLink').value = '';
+          loadSystemData();
+        } else {
+          Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: res.message, confirmButtonColor: '#0f172a' });
+        }
+      };
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run.withSuccessHandler(afterCreate).createAssignmentAndNotify(payload);
+      } else {
+        callBackend('createAssignment', payload).then(afterCreate);
+      }
+    }
+
+    function openNewResourceModal() { document.getElementById('newResourceModal').classList.remove('hidden'); }
+    function closeNewResourceModal() { document.getElementById('newResourceModal').classList.add('hidden'); }
+
+    function handleCreateResource(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSubmitNewRes');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...';
+
+      const payload = {
+        resource_id: document.getElementById('newResId').value.trim(),
+        category: document.getElementById('newResCategory').value.trim(),
+        title: document.getElementById('newResTitle').value.trim(),
+        description: document.getElementById('newResDesc').value.trim(),
+        file_link: document.getElementById('newResLink').value.trim(),
+        thumbnail_url: document.getElementById('newResThumb').value.trim(),
+        updated_date: document.getElementById('newResDate').value.trim()
+      };
+
+      const afterRes = (res) => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> บันทึกข้อมูลลงคลังสื่อ';
+        if (res.success) {
+          Swal.fire({ icon: 'success', title: 'สำเร็จ', text: res.message, confirmButtonColor: '#0f172a' });
+          closeNewResourceModal();
+          document.getElementById('newResId').value = '';
+          document.getElementById('newResCategory').value = '';
+          document.getElementById('newResTitle').value = '';
+          document.getElementById('newResDesc').value = '';
+          document.getElementById('newResLink').value = '';
+          document.getElementById('newResThumb').value = '';
+          document.getElementById('newResDate').value = '';
+          loadSystemData();
+        } else {
+          Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: res.message, confirmButtonColor: '#0f172a' });
+        }
+      };
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run.withSuccessHandler(afterRes).createResource(payload);
+      } else {
+        callBackend('createResource', payload).then(afterRes);
+      }
+    }
+
+    function renderTasks(tasks) {
+      const container = document.getElementById('assignmentCards');
+      if (!tasks || tasks.length === 0) {
+        container.innerHTML = '<div class="col-span-2 text-center py-10 text-slate-400 bg-white rounded-3xl border border-dashed border-slate-300">ยังไม่มีภารกิจที่มอบหมายในขณะนี้</div>';
+        return;
+      }
+      container.innerHTML = tasks.map(t => {
+        const isOpen = (t.status || '').toLowerCase() === 'open';
+        return `
+          <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between card-academic">
+            <div>
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-900 border border-blue-200">${t.id}</span>
+                  <span class="badge-status ${isOpen ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500'}">
+                    <i class="fa-solid ${isOpen ? 'fa-door-open' : 'fa-lock'}"></i> ${t.status}
+                  </span>
+                </div>
+                <span class="text-xs text-rose-600 font-semibold"><i class="fa-regular fa-calendar"></i> กำหนดส่ง: ${t.dueDate || '-'}</span>
+              </div>
+              <h4 class="text-sm sm:text-base font-bold text-slate-900 leading-snug">${t.title}</h4>
+              <p class="text-xs text-slate-600 mt-2 whitespace-pre-line leading-relaxed">${t.description || '-'}</p>
+            </div>
+            <div class="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between">
+              ${t.templateLink ? `<a href="${t.templateLink}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline flex items-center gap-1"><i class="fa-solid fa-file-arrow-down"></i> เอกสารตัวอย่าง / Template</a>` : `<span></span>`}
+              ${isOpen ? `
+                <button onclick="openSubmitForm('${t.id}', '${t.title}')" class="px-4 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-white text-xs font-semibold shadow transition flex items-center gap-1.5">
+                  <i class="fa-solid fa-cloud-arrow-up"></i> ส่งงานภารกิจนี้
+                </button>
+              ` : `<span class="text-xs text-slate-400 font-semibold">ปิดรับงานแล้ว</span>`}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openSubmitForm(id, title) {
+      document.getElementById('subTaskId').value = id;
+      document.getElementById('targetTaskTitle').textContent = title;
+      document.getElementById('submitModal').classList.remove('hidden');
+      window.scrollTo({ top: document.getElementById('submitModal').offsetTop - 80, behavior: 'smooth' });
+    }
+    function closeSubmitForm() { document.getElementById('submitModal').classList.add('hidden'); }
+
+    function handleAssignmentSubmit(e) {
+      e.preventDefault();
+      const fileInput = document.getElementById('subFileInput');
+      const btn = document.getElementById('btnUploadSubmit');
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังอัปโหลด...';
+
+      const payload = {
+        username: currentUser.username,
+        teacherName: currentUser.fullName,
+        schoolName: currentUser.schoolName,
+        assignmentId: document.getElementById('subTaskId').value,
+        researchTitle: document.getElementById('subResearchTitle').value.trim(),
+        fileLink: document.getElementById('subFileLink').value.trim(),
+        reflection: document.getElementById('subReflection').value.trim(),
+        fileName: '',
+        fileData: ''
+      };
+
+      if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        payload.fileName = file.name;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          payload.fileData = evt.target.result;
+          sendAssignmentData(payload, btn);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        sendAssignmentData(payload, btn);
+      }
+    }
+
+    function sendAssignmentData(payload, btn) {
+      const afterSubmit = (res) => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ยืนยันการส่งงาน';
+        if (res.success) {
+          Swal.fire({ icon: 'success', title: 'ส่งงานเรียบร้อย', text: res.message, confirmButtonColor: '#0f172a' });
+          closeSubmitForm();
+          loadSystemData();
+        } else {
+          Swal.fire({ icon: 'error', title: 'ล้มเหลว', text: res.message, confirmButtonColor: '#0f172a' });
+        }
+      };
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run.withSuccessHandler(afterSubmit).submitAssignment(payload);
+      } else {
+        callBackend('submitAssignment', payload).then(afterSubmit);
+      }
+    }
+
+    function filterSubmissions() {
+      const q = (document.getElementById('subSearchInput').value || '').toLowerCase().trim();
+      const filterSt = document.getElementById('subStatusFilter').value;
+      const all = systemData.submissions || [];
+
+      const filtered = all.filter(s => {
+        const matchQ = (s.researchTitle || '').toLowerCase().includes(q) || (s.teacherName || '').toLowerCase().includes(q) || (s.schoolName || '').toLowerCase().includes(q);
+        const matchSt = (filterSt === 'ALL') || (s.status === filterSt);
+        return matchQ && matchSt;
+      });
+
+      renderSubmissions(filtered);
+    }
+
+    function renderSubmissions(list) {
+      const tbody = document.getElementById('submissionTableBody');
+      if (!list || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400 font-medium">ยังไม่มีประวัติการส่งงานตามเงื่อนไขที่ค้นหา</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.map(s => {
+        let badgeStyle = 'bg-amber-50 text-amber-800 border border-amber-200';
+        let badgeIcon = 'fa-clock';
+        if (s.status === 'ผ่านการนิเทศ') { badgeStyle = 'bg-emerald-50 text-emerald-800 border border-emerald-200'; badgeIcon = 'fa-circle-check'; }
+        else if (s.status === 'ปรับปรุงแก้ไข') { badgeStyle = 'bg-rose-50 text-rose-800 border border-rose-200'; badgeIcon = 'fa-triangle-exclamation'; }
+        else if (s.status.includes('ส่งแก้ไข')) { badgeStyle = 'bg-blue-50 text-blue-800 border border-blue-200'; badgeIcon = 'fa-arrows-rotate'; }
+
+        const isTeacher = (currentUser.role === 'teacher');
+        const canFeedback = (currentUser.role === 'supervisor' || currentUser.role === 'admin');
+        const canResubmit = (isTeacher && (s.status === 'ปรับปรุงแก้ไข' || s.status.includes('รอตรวจ')));
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="px-3.5 py-3 whitespace-nowrap text-xs text-slate-500">${s.timestamp}</td>
+            <td class="px-3.5 py-3 font-medium text-slate-800">
+              ${s.teacherName}
+              <div class="text-[11px] text-slate-400 font-normal">${s.schoolName}</div>
+            </td>
+            <td class="px-3.5 py-3 max-w-[200px] font-semibold text-slate-900 leading-snug">${s.researchTitle}</td>
+            <td class="px-3.5 py-3 whitespace-nowrap">
+              ${s.fileLink ? `<a href="${s.fileLink}" target="_blank" class="text-blue-600 hover:text-blue-800 font-medium hover:underline inline-flex items-center gap-1"><i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดไฟล์</a>` : '<span class="text-slate-300">-</span>'}
+            </td>
+            <td class="px-3.5 py-3 whitespace-nowrap">
+              <span class="badge-status ${badgeStyle}"><i class="fa-solid ${badgeIcon}"></i> ${s.status || 'รอตรวจ'}</span>
+            </td>
+            <td class="px-3.5 py-3 max-w-[220px] whitespace-pre-line text-slate-700">
+              ${s.supervisorComment ? `<div class="bg-blue-50/60 p-2.5 rounded-xl border-l-2 border-blue-600 text-[11px] leading-relaxed">${s.supervisorComment}</div>` : '<span class="text-slate-300 italic text-[11px]">- ยังไม่มีบันทึกนิเทศ -</span>'}
+            </td>
+            <td class="px-3.5 py-3 text-right whitespace-nowrap">
+              ${canFeedback ? `<button onclick="openFeedbackModal(${s.rowId}, '${s.teacherName}', '${s.researchTitle}')" class="px-3 py-1.5 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white text-[11px] font-semibold shadow transition"><i class="fa-solid fa-pen-to-square"></i> นิเทศคืน</button>` : ''}
+              ${canResubmit ? `<button onclick="openResubmitModal(${s.rowId}, '${s.researchTitle}', '${s.fileLink}')" class="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-semibold ml-1 shadow transition"><i class="fa-solid fa-arrows-rotate"></i> ส่งฉบับแก้ไข</button>` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openFeedbackModal(rowId, teacherName, title) {
+      Swal.fire({
+        title: 'บันทึกการนิเทศและข้อเสนอแนะเชิงวิชาการ',
+        html: `
+          <div class="text-left text-xs space-y-3">
+            <p><strong>ครูผู้รับการนิเทศ:</strong> ${teacherName}</p>
+            <p><strong>ชื่องานวิจัย:</strong> ${title}</p>
+            <div>
+              <label class="block font-semibold mb-1">ผลการพิจารณา / สถานะ:</label>
+              <select id="swalStatus" class="w-full p-2.5 border rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-blue-600">
+                <option value="ผ่านการนิเทศ">ผ่านการนิเทศ</option>
+                <option value="ปรับปรุงแก้ไข">ปรับปรุงแก้ไข</option>
+                <option value="กำลังนิเทศ">กำลังนิเทศ</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-semibold mb-1">ข้อเสนอแนะเชิงวิชาการจากผู้นิเทศ (ศน.):</label>
+              <textarea id="swalComment" rows="4" class="w-full p-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-600" placeholder="ระบุข้อคิดเห็นทางระเบียบวิธีวิจัยและสถิติ Jamovi..."></textarea>
+            </div>
+            <p class="text-[11px] text-blue-700 bg-blue-50 p-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-paper-plane"></i> ระบบจะส่งอีเมลแจ้งผลการนิเทศไปยังครูผู้สอนโดยอัตโนมัติ</p>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'บันทึกและส่งแจ้งเตือน',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#0f172a',
+        preConfirm: () => {
+          return {
+            rowId: rowId,
+            teacherName: teacherName,
+            researchTitle: title,
+            status: document.getElementById('swalStatus').value,
+            comment: document.getElementById('swalComment').value.trim()
+          };
+        }
+      }).then(result => {
+        if (result.isConfirmed) {
+          Swal.fire({ title: 'กำลังบันทึกและจัดส่งอีเมล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          const afterFeedback = (res) => {
+            Swal.fire({ icon: 'success', title: 'สำเร็จ', text: res.message, confirmButtonColor: '#0f172a' });
+            loadSystemData();
+          };
+
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run.withSuccessHandler(afterFeedback).submitFeedback(result.value);
+          } else {
+            callBackend('submitFeedback', result.value).then(afterFeedback);
+          }
+        }
+      });
+    }
+
+    function openResubmitModal(rowId, title, currentLink) {
+      document.getElementById('resubRowId').value = rowId;
+      document.getElementById('resubResearchTitle').value = title;
+      document.getElementById('resubFileLink').value = currentLink || '';
+      document.getElementById('resubReflection').value = '';
+      document.getElementById('resubmitModal').classList.remove('hidden');
+    }
+    function closeResubmitModal() { document.getElementById('resubmitModal').classList.add('hidden'); }
+
+    function handleResubmit(e) {
+      e.preventDefault();
+      const fileInput = document.getElementById('resubFileInput');
+      const btn = document.getElementById('btnConfirmResubmit');
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่งฉบับแก้ไข...';
+
+      const payload = {
+        rowId: document.getElementById('resubRowId').value,
+        teacherName: currentUser.fullName,
+        researchTitle: document.getElementById('resubResearchTitle').value.trim(),
+        fileLink: document.getElementById('resubFileLink').value.trim(),
+        reflection: document.getElementById('resubReflection').value.trim(),
+        fileName: '',
+        fileData: ''
+      };
+
+      if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        payload.fileName = file.name;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          payload.fileData = evt.target.result;
+          sendResubmitData(payload, btn);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        sendResubmitData(payload, btn);
+      }
+    }
+
+    function sendResubmitData(payload, btn) {
+      const afterResub = (res) => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ยืนยันการส่งฉบับแก้ไข';
+        if (res.success) {
+          Swal.fire({ icon: 'success', title: 'ส่งงานแก้ไขสำเร็จ', text: res.message, confirmButtonColor: '#0f172a' });
+          closeResubmitModal();
+          loadSystemData();
+        } else {
+          Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: res.message, confirmButtonColor: '#0f172a' });
+        }
+      };
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run.withSuccessHandler(afterResub).resubmitAssignment(payload);
+      } else {
+        callBackend('resubmitAssignment', payload).then(afterResub);
+      }
+    }
+
+    function renderResources(list) {
+      const container = document.getElementById('resourceCards');
+      if (!list || list.length === 0) {
+        container.innerHTML = '<div class="col-span-3 text-center py-10 text-slate-400 bg-white rounded-3xl border border-dashed border-slate-300">ยังไม่มีรายการสื่อในคลัง</div>';
+        return;
+      }
+      container.innerHTML = list.map(r => `
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between overflow-hidden card-academic">
+          ${r.thumbnailUrl ? `
+            <div class="h-36 bg-slate-100 overflow-hidden border-b border-slate-100 flex items-center justify-center">
+              <img src="${r.thumbnailUrl}" alt="${r.title}" class="w-full h-full object-cover">
+            </div>
+          ` : ''}
+          <div class="p-6 flex-1 flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-start mb-2.5">
+                <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200">${r.category || 'ทั่วไป'}</span>
+                <span class="text-[10px] text-slate-400">${r.updatedDate || ''}</span>
+              </div>
+              <h4 class="text-sm font-bold text-slate-900 leading-snug">${r.title}</h4>
+              <p class="text-xs text-slate-600 mt-1.5 whitespace-pre-line leading-relaxed line-clamp-3">${r.description || '-'}</p>
+            </div>
+            <div class="mt-5 pt-3.5 border-t border-slate-100 text-right">
+              ${r.fileLink ? `
+                <a href="${r.fileLink}" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 text-xs font-semibold transition">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดดู / ดาวน์โหลด
+                </a>
+              ` : '<span class="text-xs text-slate-300">- ไม่มีลิงก์แนบ -</span>'}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderQA(list) {
+      const container = document.getElementById('qaListContainer');
+      if (!list || list.length === 0) {
+        container.innerHTML = '<div class="text-center py-10 text-slate-400 bg-white rounded-3xl border border-dashed border-slate-300">ยังไม่มีคำถามในคลินิกวิจัย</div>';
+        return;
+      }
+      container.innerHTML = list.map(q => {
+        const canAnswer = (currentUser.role === 'supervisor' || currentUser.role === 'admin');
+        const isAnswered = q.status === 'ตอบแล้ว';
+        return `
+          <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3 card-academic">
+            <div class="flex justify-between items-start">
+              <div>
+                <span class="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                  <i class="fa-regular fa-circle-question text-emerald-600"></i> ${q.topic}
+                </span>
+                <p class="text-[11px] text-slate-400 mt-0.5">ถามโดย: ${q.teacherName} (${q.schoolName}) • ${q.timestamp}</p>
+              </div>
+              <span class="badge-status ${isAnswered ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200'}">
+                <i class="fa-solid ${isAnswered ? 'fa-check' : 'fa-hourglass-half'}"></i> ${q.status}
+              </span>
+            </div>
+            <p class="text-xs text-slate-700 bg-slate-50/80 p-3.5 rounded-2xl leading-relaxed">${q.detail}</p>
+            ${q.answer ? `
+              <div class="bg-blue-50/70 border-l-4 border-blue-600 p-3.5 rounded-r-2xl text-xs space-y-1 mt-2">
+                <p class="font-bold text-blue-950 flex items-center gap-1.5"><i class="fa-solid fa-reply text-blue-600"></i> คำตอบจาก ${q.answeredBy || 'ศึกษานิเทศก์'}:</p>
+                <p class="text-slate-700 whitespace-pre-line leading-relaxed">${q.answer}</p>
+              </div>
+            ` : ''}
+            ${canAnswer && !isAnswered ? `
+              <div class="text-right pt-2">
+                <button onclick="openAnswerModal(${q.rowId}, '${q.topic}')" class="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold shadow transition flex items-center gap-1.5 ml-auto">
+                  <i class="fa-solid fa-reply"></i> ตอบคำถามนี้ (ส่งแจ้งเตือนครู)
+                </button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openQuestionModal() {
+      Swal.fire({
+        title: 'ตั้งกระทู้ถามในคลินิกวิจัย',
+        html: `
+          <div class="text-left text-xs space-y-3">
+            <div>
+              <label class="block font-semibold mb-1">หัวข้อคำถาม (เช่น ปัญหาคำนวณ Paired t-test ใน Jamovi):</label>
+              <input type="text" id="qTopic" class="w-full p-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500" placeholder="ระบุหัวข้อคำถาม...">
+            </div>
+            <div>
+              <label class="block font-semibold mb-1">รายละเอียดข้อสงสัย / ข้อความ Error:</label>
+              <textarea id="qDetail" rows="4" class="w-full p-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500" placeholder="อธิบายขั้นตอนที่ท่านดำเนินการ หรือข้อความ Error ที่โปรแกรมแจ้งเตือน..."></textarea>
+            </div>
+            <p class="text-[11px] text-emerald-800 bg-emerald-50 p-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-paper-plane"></i> เมื่อส่งคำถามแล้ว ระบบจะแจ้งเตือนไปยังอีเมลของศึกษานิเทศก์ให้ทันที</p>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'ส่งคำถาม',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#047857',
+        preConfirm: () => {
+          const t = document.getElementById('qTopic').value.trim();
+          const d = document.getElementById('qDetail').value.trim();
+          if (!t || !d) {
+            Swal.showValidationMessage('กรุณากรอกหัวข้อและรายละเอียดคำถามให้ครบถ้วน');
+            return false;
+          }
+          return {
+            username: currentUser.username,
+            teacherName: currentUser.fullName,
+            schoolName: currentUser.schoolName,
+            topic: t,
+            detail: d
+          };
+        }
+      }).then(res => {
+        if (res.isConfirmed && res.value) {
+          Swal.fire({ title: 'กำลังส่งคำถาม...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          const afterQ = (r) => {
+            Swal.fire({ icon: 'success', title: 'สำเร็จ', text: r.message, confirmButtonColor: '#047857' });
+            loadSystemData();
+          };
+
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run.withSuccessHandler(afterQ).submitQuestion(res.value);
+          } else {
+            callBackend('submitQuestion', res.value).then(afterQ);
+          }
+        }
+      });
+    }
+
+    function openAnswerModal(rowId, topic) {
+      Swal.fire({
+        title: 'ตอบคำถามคลินิกวิจัย',
+        html: `
+          <div class="text-left text-xs space-y-2">
+            <p><strong>หัวข้อคำถาม:</strong> <span class="text-blue-900 font-bold">${topic}</span></p>
+            <label class="block font-semibold mt-2">พิมพ์คำตอบและแนวทางแก้ไข:</label>
+            <textarea id="ansText" rows="4" class="w-full p-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-600" placeholder="ระบุขั้นตอนการแก้ไข หรือการตั้งค่าตัวแปรใน Jamovi..."></textarea>
+            <p class="text-[11px] text-blue-700 bg-blue-50 p-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-envelope"></i> ระบบจะส่งคำตอบนี้ไปยังอีเมลของคุณครูผู้ถามทันที</p>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'ส่งคำตอบ & แจ้งเตือนครู',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#0f172a',
+        preConfirm: () => {
+          const ans = document.getElementById('ansText').value.trim();
+          if (!ans) {
+            Swal.showValidationMessage('กรุณากรอกคำตอบก่อนกดยืนยัน');
+            return false;
+          }
+          return {
+            rowId: rowId,
+            answer: ans,
+            answeredBy: currentUser.fullName
+          };
+        }
+      }).then(res => {
+        if (res.isConfirmed && res.value) {
+          Swal.fire({ title: 'กำลังบันทึกคำตอบและจัดส่งอีเมล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          const afterAns = (r) => {
+            Swal.fire({ icon: 'success', title: 'สำเร็จ', text: r.message, confirmButtonColor: '#0f172a' });
+            loadSystemData();
+          };
+
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run.withSuccessHandler(afterAns).answerQuestion(res.value);
+          } else {
+            callBackend('answerQuestion', res.value).then(afterAns);
+          }
+        }
+      });
+    }
+
+    function openStatGuideModal() { document.getElementById('statGuideModal').classList.remove('hidden'); }
+    function closeStatGuideModal() { document.getElementById('statGuideModal').classList.add('hidden'); }
+  </script>
+</body>
+</html>
