@@ -81,7 +81,10 @@
       </div>
 
       <!-- สิทธิ์ / ผู้ใช้งาน & ปุ่มออกจากระบบ -->
-      <div id="userInfoHeader" class="hidden flex items-center space-x-3 sm:space-x-4">
+      <div id="userInfoHeader" class="hidden flex items-center space-x-2 sm:space-x-3">
+        <button onclick="promptForGasUrl()" id="btnGasConfig" title="ตั้งค่าเชื่อมต่อ Google Apps Script Web App" class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl transition">
+          <i class="fa-solid fa-plug text-emerald-400"></i> <span class="hidden md:inline">เชื่อมต่อ Apps Script</span>
+        </button>
         <button onclick="openStatGuideModal()" title="คู่มือสถิติ Jamovi ฉบับย่อ" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 rounded-xl transition">
           <i class="fa-solid fa-lightbulb text-amber-400"></i> คู่มือสถิติ Jamovi
         </button>
@@ -607,8 +610,10 @@
   <script>
     // 🌐 ตัวแปร Configuration
     const SPREADSHEET_ID = "1Aw6biBPPJ-JYfU-wNRRsVW8JS8Hop_BmdywBXqSCw-Q";
-    // เมื่อ Deploy Google Apps Script ให้ระบุ Web App URL ที่นี่ (เพื่อใช้งานฟังก์ชันส่งงาน/ตอบคำถาม/ส่งอีเมล)
-    let GAS_API_URL = localStorage.getItem('jamovi_gas_api_url') || ""; 
+    // Web App URL ของ Google Apps Script สำหรับประมวลผล Backend
+    const DEFAULT_GAS_API_URL = "https://script.google.com/macros/s/AKfycbzPXxzLDWYc_mPfIqtbgMzrnt9IaFpudzA8_P8mR7OoDgJv4tDHde-p-vsVpUtshKEawQ/exec";
+    const storedUrl = localStorage.getItem('jamovi_gas_api_url');
+    let GAS_API_URL = (storedUrl && storedUrl.startsWith("https://script.google.com/")) ? storedUrl : DEFAULT_GAS_API_URL; 
 
     let currentUser = null;
     let systemData = { assignments: [], submissions: [], resources: [], qaBoard: [] };
@@ -654,7 +659,7 @@
             .withSuccessHandler(res => resolve(res))
             .withFailureHandler(err => reject(err))
             [actionName](payload);
-        } else if (GAS_API_URL && !GAS_API_URL.includes("Example")) {
+        } else if (GAS_API_URL && !GAS_API_URL.includes("Example") && GAS_API_URL.startsWith("https://script.google.com/")) {
           // โหมด External Hosting (Vercel) ที่ผูก Web App URL แล้ว
           const dataToSend = { action: actionName, ...payload };
           fetch(GAS_API_URL, {
@@ -667,11 +672,58 @@
           .then(res => resolve(res))
           .catch(err => reject(err));
         } else {
-          // Fallback message สำหรับฟังก์ชันที่ต้องเขียนข้อมูล
-          resolve({ 
-            success: false, 
-            message: "กรุณาระบุ Google Apps Script Web App URL เพื่อเปิดใช้งานฟังก์ชันบันทึกข้อมูลและส่งอีเมล" 
+          // แจ้งเตือนและเปิดกล่องข้อความให้ระบุ Web App URL ทันที
+          promptForGasUrl(() => {
+            callBackend(actionName, payload).then(resolve).catch(reject);
           });
+        }
+      });
+    }
+
+    /**
+     * ฟังก์ชันเปิดกล่องตั้งค่า Google Apps Script Web App URL
+     */
+    function promptForGasUrl(callback) {
+      Swal.fire({
+        title: 'เชื่อมต่อ Google Apps Script',
+        html: `
+          <div class="text-left text-xs space-y-3">
+            <p class="text-slate-600">เพื่อเปิดใช้งานฟังก์ชัน<strong>บันทึกข้อมูลส่วนตัว, ส่งงาน, นิเทศคืน และส่งอีเมลแจ้งเตือน</strong>บน Vercel จำเป็นต้องเชื่อมต่อกับ Google Apps Script Web App URL:</p>
+            <div class="bg-blue-50/70 p-3 rounded-xl border border-blue-200 text-[11px] space-y-1 text-slate-700">
+              <p class="font-bold text-blue-900">📌 ขั้นตอนการรับ Web App URL (ทำเพียงครั้งเดียว):</p>
+              <ol class="list-decimal list-inside space-y-0.5 text-slate-600">
+                <li>เปิด Google Apps Script ที่วางโค้ด <code>Code.gs</code></li>
+                <li>กดปุ่ม <strong>Deploy (การทำให้ใช้งานได้)</strong> &gt; <strong>New deployment</strong></li>
+                <li>เลือกประเภท <strong>Web app (เว็บแอป)</strong></li>
+                <li>ตั้งค่า Execute as: <strong>Me (ฉัน)</strong></li>
+                <li>ตั้งค่า Who has access: <strong>Anyone (ทุกคน)</strong></li>
+                <li>กด Deploy แล้วคัดลอก <strong>Web app URL</strong> (ลงท้ายด้วย <code>/exec</code>) มาวางที่นี่</li>
+              </ol>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Web App Executable URL:</label>
+              <input type="url" id="swalGasUrlInput" value="${GAS_API_URL}" placeholder="https://script.google.com/macros/s/.../exec" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-600">
+            </div>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'บันทึกและเชื่อมต่อ',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#0f172a',
+        preConfirm: () => {
+          const val = document.getElementById('swalGasUrlInput').value.trim();
+          if (!val || !val.startsWith('https://script.google.com/')) {
+            Swal.showValidationMessage('กรุณาระบุ URL ที่ถูกต้อง (ขึ้นต้นด้วย https://script.google.com/)');
+            return false;
+          }
+          return val;
+        }
+      }).then(res => {
+        if (res.isConfirmed && res.value) {
+          GAS_API_URL = res.value;
+          localStorage.setItem('jamovi_gas_api_url', GAS_API_URL);
+          Swal.fire({ icon: 'success', title: 'เชื่อมต่อเรียบร้อย', text: 'ระบบบันทึกการเชื่อมต่อ Web App สำเร็จ พร้อมทำงานเต็มรูปแบบแล้วครับ', confirmButtonColor: '#0f172a' });
+          if (typeof callback === 'function') callback();
         }
       });
     }
