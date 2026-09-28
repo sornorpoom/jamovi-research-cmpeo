@@ -1,14 +1,30 @@
 /**
- * Post-Training Mentoring & Supervision Portal (Jamovi for Classroom Research)
- * กลุ่มนิเทศ ติดตามและประเมินผล สำนักงานศึกษาธิการจังหวัดเชียงใหม่
- * ผู้ประสานงาน: ศน.รัชภูมิ สมสมัย
+ * ==============================================================================
+ * โครงการ: ระบบนิเทศ ติดตามการวิจัยในชั้นเรียน (Jamovi for Classroom Research)
+ * หน่วยงาน: กลุ่มนิเทศ ติดตามและประเมินผล สำนักงานศึกษาธิการจังหวัดเชียงใหม่
+ * ผู้ประสานงานโครงการ: ศน.รัชภูมิ สมสมัย
+ * ==============================================================================
+ * Backend Core: Google Apps Script (Code.gs)
+ * รองรับ: Web App (HtmlService) และ REST API (JSON / CORS สำหรับ Vercel/External Frontend)
+ * ==============================================================================
  */
 
+// 🔹 ฐานข้อมูลและโฟลเดอร์จัดเก็บไฟล์ใน Google Drive
 const SPREADSHEET_ID = "1Aw6biBPPJ-JYfU-wNRRsVW8JS8Hop_BmdywBXqSCw-Q";
 const SUBMISSION_FOLDER_ID = "1NhLS9JWt1WkZT699ijvFDGYB043qbp7b";
 const COMMENT_FOLDER_ID = "1nkZOBjX-xAw8InFr0sExABuOUM3slrcP";
 
-function doGet() {
+/**
+ * 1. Web App Entrypoint (doGet)
+ * รองรับทั้งการเปิดผ่าน Google Apps Script Web App และการเรียกผ่าน API (GET)
+ */
+function doGet(e) {
+  // หากมีการส่ง parameter 'action' เข้ามา ให้ประมวลผลเป็น JSON API
+  if (e && e.parameter && e.parameter.action) {
+    return handleApiRequest(e.parameter.action, e.parameter);
+  }
+
+  // แสดงผลหน้าเว็บ Index.html ปกติเมื่อเปิดผ่าน Browser
   return HtmlService.createTemplateFromFile("Index")
     .evaluate()
     .setTitle("ระบบนิเทศ ติดตามการวิจัยในชั้นเรียน (Jamovi) - ศธจ.เชียงใหม่")
@@ -16,10 +32,90 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-// ค้นหาหรือสร้างโฟลเดอร์ย่อยตามชื่อครู
+/**
+ * 2. REST API Entrypoint (doPost)
+ * รองรับการยิง Request จาก Frontend ภายนอก เช่น Vercel หรือ Custom Domain
+ */
+function doPost(e) {
+  try {
+    let payload = {};
+    if (e.postData && e.postData.contents) {
+      payload = JSON.parse(e.postData.contents);
+    } else if (e.parameter) {
+      payload = e.parameter;
+    }
+    const action = payload.action || (e.parameter && e.parameter.action);
+    return handleApiRequest(action, payload);
+  } catch (err) {
+    return createJsonResponse({ success: false, message: "Invalid JSON format: " + err.toString() });
+  }
+}
+
+/**
+ * ตัวจัดการ Routing สำหรับ API ภายนอก
+ */
+function handleApiRequest(action, data) {
+  let result = { success: false, message: "Unknown Action" };
+
+  try {
+    switch (action) {
+      case "login":
+        result = loginUser(data.username, data.password);
+        break;
+      case "getInitialData":
+        result = getInitialData(data.username, data.role);
+        break;
+      case "updateUserProfile":
+        result = updateUserProfile(data);
+        break;
+      case "createAssignment":
+        result = createAssignmentAndNotify(data);
+        break;
+      case "createResource":
+        result = createResource(data);
+        break;
+      case "submitAssignment":
+        result = submitAssignment(data);
+        break;
+      case "resubmitAssignment":
+        result = resubmitAssignment(data);
+        break;
+      case "submitFeedback":
+        result = submitFeedback(data);
+        break;
+      case "submitQuestion":
+        result = submitQuestion(data);
+        break;
+      case "answerQuestion":
+        result = answerQuestion(data);
+        break;
+      case "ping":
+        result = { success: true, message: "API Service is Active", timestamp: new Date().toISOString() };
+        break;
+      default:
+        result = { success: false, message: `Action '${action}' not found` };
+    }
+  } catch (err) {
+    result = { success: false, message: "Server Error: " + err.toString() };
+  }
+
+  return createJsonResponse(result);
+}
+
+/**
+ * ฟังก์ชันแปลงผลลัพธ์เป็น JSON Response พร้อมกำหนด Header CORS
+ */
+function createJsonResponse(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * ค้นหาหรือสร้างโฟลเดอร์ย่อยตามชื่อครูผู้ส่งงาน
+ */
 function getOrCreateTeacherFolder(parentFolderId, teacherName) {
   const parentFolder = DriveApp.getFolderById(parentFolderId);
-  const folderName = teacherName.trim();
+  const folderName = (teacherName || "ทั่วไป").trim();
   const folders = parentFolder.getFoldersByName(folderName);
   if (folders.hasNext()) {
     return folders.next();
@@ -27,7 +123,13 @@ function getOrCreateTeacherFolder(parentFolderId, teacherName) {
   return parentFolder.createFolder(folderName);
 }
 
-// 1. เข้าสู่ระบบ
+// ==============================================================================
+// 3. ฟังก์ชันหลักในการจัดการระบบ (Business Logic)
+// ==============================================================================
+
+/**
+ * เข้าสู่ระบบ (Authentication)
+ */
 function loginUser(username, password) {
   try {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -47,7 +149,7 @@ function loginUser(username, password) {
 
       if (u === String(username).trim() && p === String(password).trim()) {
         if (status.toLowerCase() === "inactive") {
-          return { success: false, message: "บัญชีนี้ถูกระงับการใช้งานชั่วคราว" };
+          return { success: false, message: "บัญชีนี้ถูกระงับการใช้งานชั่วคราว โปรดติดต่อผู้ดูแลระบบ" };
         }
         return {
           success: true,
@@ -63,16 +165,18 @@ function loginUser(username, password) {
         };
       }
     }
-    return { success: false, message: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" };
+    return { success: false, message: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง โปรดตรวจสอบอีกครั้ง" };
   } catch (err) {
-    return { success: false, message: "Error: " + err.toString() };
+    return { success: false, message: "ข้อผิดพลาดระบบ: " + err.toString() };
   }
 }
 
-// 2. ปรับปรุงข้อมูลส่วนตัว & รหัสผ่าน
+/**
+ * ปรับปรุงข้อมูลส่วนตัวและเปลี่ยนรหัสผ่าน
+ */
 function updateUserProfile(payload) {
   const lock = LockService.getScriptLock();
-  lock.tryLock(10000);
+  lock.tryLock(15000);
   try {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const sheet = ss.getSheetByName("Users");
@@ -87,7 +191,7 @@ function updateUserProfile(payload) {
       if (existingUser === currentUsername) {
         targetRow = i + 1;
       } else if (existingUser === String(payload.newUsername).trim()) {
-        return { success: false, message: "ชื่อผู้ใช้งาน (Username) นี้มีผู้ใช้งานแล้ว โปรดใช้ชื่ออื่น" };
+        return { success: false, message: "ชื่อผู้ใช้งาน (Username) นี้มีผู้ใช้งานแล้ว โปรดระบุชื่ออื่น" };
       }
     }
 
@@ -123,34 +227,39 @@ function updateUserProfile(payload) {
   }
 }
 
-// 3. ดึงข้อมูลระบบ
+/**
+ * ดึงข้อมูลระบบทั้งหมด (Assignments, Submissions, Resources, QA_Board)
+ */
 function getInitialData(username, role) {
   try {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
 
-    // ภารกิจ (Assignments)
+    // 1. ภารกิจ (Assignments)
     const assignSheet = ss.getSheetByName("Assignments");
     let assignments = [];
     if (assignSheet && assignSheet.getLastRow() > 1) {
       const aData = assignSheet.getDataRange().getDisplayValues();
       for (let i = 1; i < aData.length; i++) {
+        if (!aData[i][0]) continue;
         assignments.push({
           id: aData[i][0],
           title: aData[i][1],
           description: aData[i][2],
           dueDate: aData[i][3],
           templateLink: aData[i][4],
-          status: aData[i][5]
+          status: aData[i][5] || "Open"
         });
       }
     }
 
-    // ประวัติการส่งงาน (Submissions)
+    // 2. รายการส่งงาน (Submissions)
     const subSheet = ss.getSheetByName("Submissions");
     let submissions = [];
     if (subSheet && subSheet.getLastRow() > 1) {
       const sData = subSheet.getDataRange().getDisplayValues();
       for (let i = 1; i < sData.length; i++) {
+        if (!sData[i][0]) continue;
+        // หากเป็นครู ให้เห็นเฉพาะผลงานของตนเอง
         if (role === "teacher" && String(sData[i][2]).trim() !== String(username).trim()) {
           continue;
         }
@@ -165,19 +274,20 @@ function getInitialData(username, role) {
           researchTitle: sData[i][6],
           fileLink: sData[i][7],
           teacherReflection: sData[i][8],
-          status: sData[i][9],
+          status: sData[i][9] || "รอตรวจ",
           supervisorComment: sData[i][10],
           feedbackDate: sData[i][11] || "-"
         });
       }
     }
 
-    // คลังสื่อ (Resources)
+    // 3. คลังสื่อ (Resources)
     const resSheet = ss.getSheetByName("Resources");
     let resources = [];
     if (resSheet && resSheet.getLastRow() > 1) {
       const rData = resSheet.getDataRange().getDisplayValues();
       for (let i = 1; i < rData.length; i++) {
+        if (!rData[i][0]) continue;
         resources.push({
           id: rData[i][0],
           category: rData[i][1],
@@ -190,12 +300,13 @@ function getInitialData(username, role) {
       }
     }
 
-    // กระดานถามตอบ (QA_Board)
+    // 4. กระดานถามตอบ (QA_Board)
     const qaSheet = ss.getSheetByName("QA_Board");
     let qaBoard = [];
     if (qaSheet && qaSheet.getLastRow() > 1) {
       const qData = qaSheet.getDataRange().getDisplayValues();
       for (let i = 1; i < qData.length; i++) {
+        if (!qData[i][0]) continue;
         qaBoard.push({
           rowId: i + 1,
           postId: qData[i][0],
@@ -207,7 +318,7 @@ function getInitialData(username, role) {
           detail: qData[i][6],
           answer: qData[i][7],
           answeredBy: qData[i][8],
-          status: qData[i][9]
+          status: qData[i][9] || "รอตอบ"
         });
       }
     }
@@ -220,18 +331,20 @@ function getInitialData(username, role) {
       qaBoard: qaBoard.reverse()
     };
   } catch (err) {
-    return { success: false, message: "Error: " + err.toString() };
+    return { success: false, message: "Error loading initial data: " + err.toString() };
   }
 }
 
-// 4. เพิ่มภารกิจใหม่
+/**
+ * เพิ่มภารกิจใหม่และส่งอีเมลแจ้งเตือนคุณครูทุกคน
+ */
 function createAssignmentAndNotify(payload) {
   const lock = LockService.getScriptLock();
   lock.tryLock(30000);
   try {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const assignSheet = ss.getSheetByName("Assignments");
-    if (!assignSheet) return { success: false, message: "ไม่พบแท็บ Assignments ในฐานข้อมูล" };
+    if (!assignSheet) return { success: false, message: "ไม่พบแท็บ Assignments" };
 
     assignSheet.appendRow([
       payload.assignment_id.trim(),
@@ -256,25 +369,25 @@ function createAssignmentAndNotify(payload) {
 
         if (role === "teacher" && status === "active" && teacherEmail.includes("@")) {
           const htmlBody = `
-            <div style="font-family: 'Sarabun', Arial, sans-serif; line-height: 1.7; color: #1e293b; max-width: 650px; margin: auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
-              <div style="background-color: #1e3a8a; color: #ffffff; padding: 24px; text-align: center;">
-                <h2 style="margin: 0; font-size: 20px;">การมอบหมายภารกิจการวิจัยในชั้นเรียน (Jamovi)</h2>
+            <div style="font-family: 'Sarabun', Arial, sans-serif; line-height: 1.8; color: #1e293b; max-width: 650px; margin: auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+              <div style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); color: #ffffff; padding: 26px; text-align: center;">
+                <h2 style="margin: 0; font-size: 20px; font-weight: 700;">การมอบหมายภารกิจการวิจัยในชั้นเรียน (Jamovi)</h2>
                 <p style="margin: 6px 0 0 0; font-size: 13px; color: #cbd5e1;">กลุ่มนิเทศ ติดตามและประเมินผล สำนักงานศึกษาธิการจังหวัดเชียงใหม่</p>
               </div>
-              <div style="padding: 24px;">
+              <div style="padding: 26px;">
                 <p><strong>เรียน คุณครู ${teacherName}</strong></p>
-                <p>กลุ่มนิเทศ ติดตามและประเมินผล ได้มอบหมายภารกิจการวิจัยในชั้นเรียนรายการใหม่ โดยมีรายละเอียดดังนี้:</p>
-                <div style="background-color: #f8fafc; border-left: 4px solid #1e3a8a; padding: 16px; margin: 18px 0; border-radius: 6px; font-size: 14px;">
-                  <p style="margin: 4px 0;"><strong>รหัสภารกิจ:</strong> ${payload.assignment_id}</p>
-                  <p style="margin: 4px 0;"><strong>หัวข้อ:</strong> <span style="color: #1e3a8a; font-weight: bold;">${payload.title}</span></p>
-                  <p style="margin: 4px 0;"><strong>คำชี้แจง:</strong><br><span style="white-space: pre-line; color: #475569;">${payload.description}</span></p>
-                  <p style="margin: 4px 0;"><strong>กำหนดส่ง:</strong> <span style="color: #dc2626; font-weight: bold;">${payload.due_date}</span></p>
-                  ${payload.template_link ? `<p style="margin: 6px 0 0 0;"><strong>ตัวอย่าง/เทมเพลต:</strong> <a href="${payload.template_link}" target="_blank" style="color: #2563eb; text-decoration: underline;">คลิกเพื่อเปิดดู</a></p>` : ''}
+                <p>กลุ่มนิเทศ ติดตามและประเมินผล ได้มอบหมายภารกิจการวิจัยในชั้นเรียนรายการใหม่ รายละเอียดดังต่อไปนี้:</p>
+                <div style="background-color: #f8fafc; border-left: 4px solid #1e3a8a; padding: 18px; margin: 18px 0; border-radius: 8px; font-size: 14px;">
+                  <p style="margin: 4px 0;"><strong>รหัสภารกิจ:</strong> <span style="font-family: monospace; font-weight: bold; color: #1e3a8a;">${payload.assignment_id}</span></p>
+                  <p style="margin: 4px 0;"><strong>หัวข้อภารกิจ:</strong> <span style="color: #0f172a; font-weight: bold;">${payload.title}</span></p>
+                  <p style="margin: 6px 0 4px 0;"><strong>คำชี้แจง / ข้อกำหนด:</strong><br><span style="white-space: pre-line; color: #475569;">${payload.description}</span></p>
+                  <p style="margin: 6px 0 0 0;"><strong>กำหนดส่งผลงาน:</strong> <span style="color: #dc2626; font-weight: bold;">${payload.due_date}</span></p>
+                  ${payload.template_link ? `<p style="margin: 8px 0 0 0;"><strong>เอกสารตัวอย่าง / Template:</strong> <a href="${payload.template_link}" target="_blank" style="color: #2563eb; text-decoration: underline; font-weight: bold;">คลิกเพื่อเปิดดูเอกสาร</a></p>` : ''}
                 </div>
-                <p style="font-size: 13px; color: #64748b;">ท่านสามารถเข้าสู่ระบบ Web App เพื่ออัปโหลดไฟล์ผลงานและติดตามผลการนิเทศได้ตลอดเวลา</p>
-                <div style="margin-top: 25px; text-align: right; font-size: 13px; color: #64748b;">
+                <p style="font-size: 13px; color: #64748b;">ท่านสามารถเข้าสู่ระบบเพื่ออัปโหลดไฟล์ผลงาน (.omv / PDF) และติดตามผลการนิเทศได้ตลอดเวลา</p>
+                <div style="margin-top: 30px; text-align: right; font-size: 13px; color: #64748b; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
                   ด้วยความเคารพอย่างสูง<br>
-                  <strong style="color: #1e3a8a;">ศน.รัชภูมิ สมสมัย</strong><br>
+                  <strong style="color: #1e3a8a; font-size: 14px;">ศน.รัชภูมิ สมสมัย</strong><br>
                   กลุ่มนิเทศ ติดตามและประเมินผล ศธจ.เชียงใหม่
                 </div>
               </div>
@@ -301,14 +414,16 @@ function createAssignmentAndNotify(payload) {
   }
 }
 
-// 5. เพิ่มสื่อลงคลัง Resources
+/**
+ * เพิ่มสื่อการเรียนรู้ลงคลัง Resources
+ */
 function createResource(payload) {
   const lock = LockService.getScriptLock();
   lock.tryLock(15000);
   try {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const sheet = ss.getSheetByName("Resources");
-    if (!sheet) return { success: false, message: "ไม่พบแท็บ Resources ในฐานข้อมูล" };
+    if (!sheet) return { success: false, message: "ไม่พบแท็บ Resources" };
 
     const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
     let resId = (payload.resource_id || "").trim();
@@ -333,7 +448,9 @@ function createResource(payload) {
   }
 }
 
-// 6. ส่งงานภารกิจ
+/**
+ * ส่งงานภารกิจวิจัย (ครั้งแรก)
+ */
 function submitAssignment(payload) {
   try {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -371,13 +488,15 @@ function submitAssignment(payload) {
       ""
     ]);
 
-    return { success: true, message: "ส่งงานเรียบร้อยแล้ว", fileUrl: fileUrl };
+    return { success: true, message: "ส่งงานเรียบร้อยแล้ว ระบบได้บันทึกข้อมูลเข้าสู่ระบบเรียบร้อย", fileUrl: fileUrl };
   } catch (err) {
     return { success: false, message: "ส่งงานล้มเหลว: " + err.toString() };
   }
 }
 
-// 7. ส่งงานฉบับแก้ไข
+/**
+ * ส่งงานฉบับปรับปรุงแก้ไข (Resubmit)
+ */
 function resubmitAssignment(payload) {
   const lock = LockService.getScriptLock();
   lock.tryLock(15000);
@@ -410,7 +529,7 @@ function resubmitAssignment(payload) {
     sheet.getRange(row, 9).setValue(payload.reflection);
     sheet.getRange(row, 10).setValue("รอตรวจ (ส่งแก้ไขแล้ว)");
 
-    return { success: true, message: "ส่งงานฉบับแก้ไขเรียบร้อยแล้ว สถานะถูกปรับเป็นรอตรวจ" };
+    return { success: true, message: "ส่งงานฉบับแก้ไขเรียบร้อยแล้ว สถานะถูกปรับเป็น 'รอตรวจ (ส่งแก้ไขแล้ว)'" };
   } catch (err) {
     return { success: false, message: "เกิดข้อผิดพลาดในการส่งงานแก้ไข: " + err.toString() };
   } finally {
@@ -418,7 +537,9 @@ function resubmitAssignment(payload) {
   }
 }
 
-// 8. บันทึกผลการนิเทศคืน + ส่งอีเมลแจ้งเตือน
+/**
+ * บันทึกผลการนิเทศคืน พร้อมส่งอีเมลแจ้งเตือนถึงครู
+ */
 function submitFeedback(payload) {
   const lock = LockService.getScriptLock();
   lock.tryLock(15000);
@@ -452,20 +573,20 @@ function submitFeedback(payload) {
       const statusColor = payload.status === "ผ่านการนิเทศ" ? "#16a34a" : (payload.status === "ปรับปรุงแก้ไข" ? "#dc2626" : "#2563eb");
 
       const htmlBody = `
-        <div style="font-family: 'Sarabun', Arial, sans-serif; line-height: 1.7; color: #1e293b; max-width: 650px; margin: auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
-          <div style="background-color: #1e3a8a; color: #ffffff; padding: 22px; text-align: center;">
-            <h2 style="margin: 0; font-size: 20px;">บันทึกผลการนิเทศและข้อเสนอแนะเชิงวิชาการ</h2>
-            <p style="margin: 5px 0 0 0; font-size: 13px; color: #cbd5e1;">การประยุกต์ใช้โปรแกรม Jamovi สำหรับการวิจัยในชั้นเรียน • ศธจ.เชียงใหม่</p>
+        <div style="font-family: 'Sarabun', Arial, sans-serif; line-height: 1.8; color: #1e293b; max-width: 650px; margin: auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+          <div style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); color: #ffffff; padding: 24px; text-align: center;">
+            <h2 style="margin: 0; font-size: 20px; font-weight: 700;">บันทึกผลการนิเทศและข้อเสนอแนะเชิงวิชาการ</h2>
+            <p style="margin: 6px 0 0 0; font-size: 13px; color: #cbd5e1;">การประยุกต์ใช้โปรแกรม Jamovi สำหรับการวิจัยในชั้นเรียน • ศธจ.เชียงใหม่</p>
           </div>
-          <div style="padding: 24px;">
+          <div style="padding: 26px;">
             <p><strong>เรียน คุณครู ${payload.teacherName}</strong></p>
             <p>ศึกษานิเทศก์ได้ตรวจพิจารณารายงาน/ผลงานวิจัยของท่านเป็นที่เรียบร้อยแล้ว โดยมีรายละเอียดผลการนิเทศดังนี้:</p>
             <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; margin: 18px 0; font-size: 14px;">
-              <p style="margin: 4px 0;"><strong>ชื่องานวิจัย:</strong> <span style="color: #1e3a8a; font-weight: bold;">${payload.researchTitle}</span></p>
-              <p style="margin: 4px 0;"><strong>ผลการพิจารณา:</strong> <span style="display: inline-block; padding: 3px 10px; border-radius: 8px; font-weight: bold; color: #ffffff; background-color: ${statusColor};">${payload.status}</span></p>
-              <p style="margin: 8px 0 4px 0;"><strong>ข้อเสนอแนะเชิงวิชาการจากผู้นิเทศ:</strong></p>
-              <div style="background-color: #ffffff; border-left: 4px solid #3b82f6; padding: 12px; border-radius: 6px; color: #334155; white-space: pre-line;">${payload.comment || '- ไม่มีข้อคิดเห็นเพิ่มเติม -'}</div>
-              <p style="margin: 8px 0 0 0; font-size: 12px; color: #94a3b8;">บันทึกเมื่อ: ${nowStr}</p>
+              <p style="margin: 4px 0;"><strong>ชื่องานวิจัย:</strong> <span style="color: #0f172a; font-weight: bold;">${payload.researchTitle}</span></p>
+              <p style="margin: 6px 0;"><strong>ผลการพิจารณา:</strong> <span style="display: inline-block; padding: 3px 12px; border-radius: 20px; font-weight: bold; color: #ffffff; background-color: ${statusColor}; font-size: 13px;">${payload.status}</span></p>
+              <p style="margin: 10px 0 4px 0; font-weight: bold; color: #1e3a8a;">ข้อเสนอแนะเชิงวิชาการจากผู้นิเทศ:</p>
+              <div style="background-color: #ffffff; border-left: 4px solid #3b82f6; padding: 14px; border-radius: 8px; color: #334155; white-space: pre-line; border: 1px solid #e2e8f0; border-left-width: 4px;">${payload.comment || '- ไม่มีข้อคิดเห็นเพิ่มเติม -'}</div>
+              <p style="margin: 10px 0 0 0; font-size: 12px; color: #94a3b8;">บันทึกผลเมื่อ: ${nowStr}</p>
             </div>
             ${payload.status === "ปรับปรุงแก้ไข" ? `
               <div style="background-color: #fff1f2; border: 1px dashed #f43f5e; border-radius: 10px; padding: 14px; text-align: center; margin: 16px 0;">
@@ -474,9 +595,9 @@ function submitFeedback(payload) {
                 </p>
               </div>
             ` : ''}
-            <div style="margin-top: 25px; text-align: right; font-size: 13px; color: #64748b;">
+            <div style="margin-top: 30px; text-align: right; font-size: 13px; color: #64748b; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
               ด้วยความเคารพอย่างสูง<br>
-              <strong style="color: #1e3a8a;">ศน.รัชภูมิ สมสมัย</strong><br>
+              <strong style="color: #1e3a8a; font-size: 14px;">ศน.รัชภูมิ สมสมัย</strong><br>
               ศึกษานิเทศก์ สำนักงานศึกษาธิการจังหวัดเชียงใหม่
             </div>
           </div>
@@ -493,7 +614,7 @@ function submitFeedback(payload) {
 
     return {
       success: true,
-      message: `บันทึกผลการนิเทศเรียบร้อยแล้ว` + (emailSent ? ` พร้อมส่งอีเมลแจ้งเตือนถึงครูแล้ว (${teacherEmail})` : '')
+      message: `บันทึกผลการนิเทศเรียบร้อยแล้ว` + (emailSent ? ` พร้อมส่งอีเมลแจ้งเตือนถึงคุณครูแล้ว (${teacherEmail})` : '')
     };
   } catch (err) {
     return { success: false, message: "บันทึกล้มเหลว: " + err.toString() };
@@ -502,7 +623,9 @@ function submitFeedback(payload) {
   }
 }
 
-// 🌟 9. ตั้งคำถาม QA + ส่งอีเมลแจ้งเตือนไปยังผู้นิเทศ (ศน.ภูมิ) อัตโนมัติ (Critique 2)
+/**
+ * ตั้งคำถามในคลินิกวิจัย และส่งอีเมลแจ้งเตือนถึงผู้นิเทศ
+ */
 function submitQuestion(payload) {
   const lock = LockService.getScriptLock();
   lock.tryLock(15000);
@@ -527,7 +650,6 @@ function submitQuestion(payload) {
       "รอตอบ"
     ]);
 
-    // ค้นหาอีเมลของศึกษานิเทศก์/แอดมิน (role: supervisor หรือ admin) จากแท็บ Users
     const userSheet = ss.getSheetByName("Users");
     let notifiedSupervisors = [];
     if (userSheet && userSheet.getLastRow() > 1) {
@@ -540,22 +662,22 @@ function submitQuestion(payload) {
         if ((role === "supervisor" || role === "admin") && status === "active" && supEmail.includes("@")) {
           const subject = `[คลินิกวิจัย Jamovi] มีข้อคำถามใหม่จากคุณครู: ${payload.topic}`;
           const htmlBody = `
-            <div style="font-family: 'Sarabun', Arial, sans-serif; line-height: 1.7; color: #1e293b; max-width: 650px; margin: auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
-              <div style="background-color: #047857; color: #ffffff; padding: 22px; text-align: center;">
-                <h2 style="margin: 0; font-size: 20px;">มีข้อคำถามใหม่ในคลินิกวิจัย & Jamovi</h2>
-                <p style="margin: 5px 0 0 0; font-size: 13px; color: #a7f3d0;">ระบบนิเทศ ติดตามการวิจัยในชั้นเรียน • ศธจ.เชียงใหม่</p>
+            <div style="font-family: 'Sarabun', Arial, sans-serif; line-height: 1.8; color: #1e293b; max-width: 650px; margin: auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+              <div style="background: linear-gradient(135deg, #064e3b 0%, #047857 100%); color: #ffffff; padding: 24px; text-align: center;">
+                <h2 style="margin: 0; font-size: 20px; font-weight: 700;">มีข้อคำถามใหม่ในคลินิกวิจัย & Jamovi</h2>
+                <p style="margin: 6px 0 0 0; font-size: 13px; color: #a7f3d0;">ระบบนิเทศ ติดตามการวิจัยในชั้นเรียน • ศธจ.เชียงใหม่</p>
               </div>
-              <div style="padding: 24px;">
+              <div style="padding: 26px;">
                 <p><strong>เรียน ศึกษานิเทศก์ / ผู้ดูแลระบบ</strong></p>
-                <p>มีคุณครูผู้เข้าร่วมโครงการได้ตั้งกระทู้ซักถามปัญหาทางสถิติหรือการวิจัยในชั้นเรียน โดยมีรายละเอียดดังนี้:</p>
-                <div style="background-color: #f8fafc; border-left: 4px solid #059669; padding: 16px; margin: 18px 0; border-radius: 6px; font-size: 14px;">
+                <p>มีคุณครูผู้เข้าร่วมโครงการได้ตั้งกระทู้ซักถามปัญหาทางสถิติหรือโปรแกรม Jamovi รายละเอียดดังนี้:</p>
+                <div style="background-color: #f8fafc; border-left: 4px solid #059669; padding: 18px; margin: 18px 0; border-radius: 8px; font-size: 14px;">
                   <p style="margin: 4px 0;"><strong>ผู้ถาม:</strong> ${payload.teacherName} (${payload.schoolName})</p>
                   <p style="margin: 4px 0;"><strong>หัวข้อคำถาม:</strong> <span style="color: #065f46; font-weight: bold;">${payload.topic}</span></p>
-                  <p style="margin: 8px 0 4px 0;"><strong>รายละเอียดข้อสงสัย / ข้อผิดพลาดที่พบ:</strong></p>
-                  <div style="background-color: #ffffff; border: 1px solid #e2e8f0; padding: 12px; border-radius: 6px; color: #334155; white-space: pre-line;">${payload.detail}</div>
+                  <p style="margin: 8px 0 4px 0;"><strong>รายละเอียดข้อสงสัย / Error ที่พบ:</strong></p>
+                  <div style="background-color: #ffffff; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; color: #334155; white-space: pre-line;">${payload.detail}</div>
                   <p style="margin: 8px 0 0 0; font-size: 12px; color: #94a3b8;">เวลาที่ส่งคำถาม: ${nowStr}</p>
                 </div>
-                <p style="font-size: 13px; color: #64748b;">ท่านสามารถเข้าสู่ระบบ Web App ในแท็บ <strong>"คลินิกวิจัย & ถาม-ตอบ"</strong> เพื่อพิมพ์ตอบข้อสงสัยให้แก่คุณครูได้ทันที</p>
+                <p style="font-size: 13px; color: #64748b;">ท่านสามารถเข้าสู่ระบบเพื่อตอบข้อสงสัยให้แก่คุณครูได้ทันที</p>
               </div>
             </div>
           `;
@@ -571,7 +693,7 @@ function submitQuestion(payload) {
 
     return { 
       success: true, 
-      message: "ส่งคำถามเรียบร้อยแล้ว" + (notifiedSupervisors.length > 0 ? " (ระบบแจ้งเตือนผู้นิเทศทางอีเมลแล้ว)" : "")
+      message: "ส่งคำถามเรียบร้อยแล้ว" + (notifiedSupervisors.length > 0 ? " (ระบบได้แจ้งเตือนผู้นิเทศทางอีเมลแล้ว)" : "")
     };
   } catch (err) {
     return { success: false, message: "ล้มเหลว: " + err.toString() };
@@ -580,7 +702,9 @@ function submitQuestion(payload) {
   }
 }
 
-// 🌟 10. ตอบคำถาม QA + ส่งอีเมลแจ้งเตือนกลับไปยังครูผู้ถามโดยอัตโนมัติ (Critique 1)
+/**
+ * ตอบคำถามในคลินิกวิจัย และส่งอีเมลแจ้งคำตอบกลับหาครูผู้ถาม
+ */
 function answerQuestion(payload) {
   const lock = LockService.getScriptLock();
   lock.tryLock(15000);
@@ -594,7 +718,6 @@ function answerQuestion(payload) {
     sheet.getRange(row, 9).setValue(payload.answeredBy);
     sheet.getRange(row, 10).setValue("ตอบแล้ว");
 
-    // ดึงข้อมูลผู้ถามและอีเมลของครูเพื่อส่งแจ้งเตือน
     const teacherName = sheet.getRange(row, 4).getValue();
     const topic = sheet.getRange(row, 6).getValue();
     const detail = sheet.getRange(row, 7).getValue();
@@ -615,28 +738,28 @@ function answerQuestion(payload) {
     if (teacherEmail && teacherEmail.includes("@")) {
       const subject = `[คลินิกวิจัย Jamovi] ผู้นิเทศได้ตอบข้อคำถามของท่านแล้ว: ${topic}`;
       const htmlBody = `
-        <div style="font-family: 'Sarabun', Arial, sans-serif; line-height: 1.7; color: #1e293b; max-width: 650px; margin: auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
-          <div style="background-color: #047857; color: #ffffff; padding: 22px; text-align: center;">
-            <h2 style="margin: 0; font-size: 20px;">คลินิกวิจัยและสถิติ Jamovi ตอบคำถามแล้ว</h2>
-            <p style="margin: 5px 0 0 0; font-size: 13px; color: #a7f3d0;">กลุ่มนิเทศ ติดตามและประเมินผล สำนักงานศึกษาธิการจังหวัดเชียงใหม่</p>
+        <div style="font-family: 'Sarabun', Arial, sans-serif; line-height: 1.8; color: #1e293b; max-width: 650px; margin: auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+          <div style="background: linear-gradient(135deg, #064e3b 0%, #047857 100%); color: #ffffff; padding: 24px; text-align: center;">
+            <h2 style="margin: 0; font-size: 20px; font-weight: 700;">คลินิกวิจัยและสถิติ Jamovi ได้ตอบคำถามแล้ว</h2>
+            <p style="margin: 6px 0 0 0; font-size: 13px; color: #a7f3d0;">กลุ่มนิเทศ ติดตามและประเมินผล สำนักงานศึกษาธิการจังหวัดเชียงใหม่</p>
           </div>
-          <div style="padding: 24px;">
+          <div style="padding: 26px;">
             <p><strong>เรียน คุณครู ${teacherName}</strong></p>
-            <p>ข้อคำถามที่ท่านได้สอบถามไว้ในคลินิกวิจัย ได้รับการตอบและให้คำแนะนำจากผู้นิเทศเป็นที่เรียบร้อยแล้ว ดังนี้:</p>
+            <p>ข้อคำถามที่ท่านได้สอบถามไว้ ได้รับการตอบและให้คำแนะนำจากผู้นิเทศเป็นที่เรียบร้อยแล้ว ดังนี้:</p>
             
             <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; margin: 18px 0; font-size: 14px;">
               <p style="margin: 4px 0;"><strong>หัวข้อคำถาม:</strong> <span style="color: #065f46; font-weight: bold;">${topic}</span></p>
               <p style="margin: 4px 0; font-size: 13px; color: #64748b;"><strong>ข้อสงสัยเดิม:</strong> ${detail}</p>
-              <hr style="border: 0; border-top: 1px dashed #cbd5e1; margin: 12px 0;">
+              <hr style="border: 0; border-top: 1px dashed #cbd5e1; margin: 14px 0;">
               <p style="margin: 4px 0; font-weight: bold; color: #1e3a8a;">คำตอบและคำแนะนำจาก ${payload.answeredBy}:</p>
-              <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px; border-radius: 6px; color: #1e293b; white-space: pre-line; margin-top: 6px;">${payload.answer}</div>
+              <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 14px; border-radius: 8px; color: #1e293b; white-space: pre-line; margin-top: 8px; border: 1px solid #dbeafe; border-left-width: 4px;">${payload.answer}</div>
             </div>
 
-            <p style="font-size: 13px; color: #64748b;">ท่านสามารถเข้าสู่ระบบ Web App เพื่ออ่านคำตอบและแลกเปลี่ยนความรู้เพิ่มเติมกับเพื่อนครูได้ตลอดเวลา</p>
+            <p style="font-size: 13px; color: #64748b;">ท่านสามารถเข้าสู่ระบบ Web App เพื่ออ่านรายละเอียดและแลกเปลี่ยนความรู้เพิ่มเติมได้ตลอดเวลา</p>
             
-            <div style="margin-top: 25px; text-align: right; font-size: 13px; color: #64748b;">
+            <div style="margin-top: 30px; text-align: right; font-size: 13px; color: #64748b; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
               ด้วยความเคารพอย่างสูง<br>
-              <strong style="color: #047857;">ศน.รัชภูมิ สมสมัย</strong><br>
+              <strong style="color: #047857; font-size: 14px;">ศน.รัชภูมิ สมสมัย</strong><br>
               กลุ่มนิเทศ ติดตามและประเมินผล ศธจ.เชียงใหม่
             </div>
           </div>

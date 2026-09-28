@@ -122,7 +122,7 @@
 
       <form onsubmit="handleLogin(event)" class="space-y-4">
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1.5">รหัสผู้ใช้งาน (Username เช่น T01–T48, supervisor01...)</label>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5">รหัสผู้ใช้งาน (Username เช่น T01–T48, sornorpoom, admin...)</label>
           <div class="relative">
             <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
               <i class="fa-solid fa-user-tie"></i>
@@ -605,8 +605,10 @@
 
   <!-- ==================== JAVASCRIPT CORE ==================== -->
   <script>
-    // 🌐 ตัวแปร Configuration สำหรับเชื่อมต่อ Google Apps Script Web App เมื่อรันภายนอก (เช่น Vercel)
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwO4WvI5p7C7YxZ2YJ_w7gP1x8Kq_Example/exec"; // ระบุ URL Web App ของ Apps Script
+    // 🌐 ตัวแปร Configuration
+    const SPREADSHEET_ID = "1Aw6biBPPJ-JYfU-wNRRsVW8JS8Hop_BmdywBXqSCw-Q";
+    // เมื่อ Deploy Google Apps Script ให้ระบุ Web App URL ที่นี่ (เพื่อใช้งานฟังก์ชันส่งงาน/ตอบคำถาม/ส่งอีเมล)
+    let GAS_API_URL = localStorage.getItem('jamovi_gas_api_url') || ""; 
 
     let currentUser = null;
     let systemData = { assignments: [], submissions: [], resources: [], qaBoard: [] };
@@ -620,6 +622,28 @@
     };
 
     /**
+     * ดึงข้อมูลตรงจาก Google Sheets ผ่าน Google Visualization API (GViz)
+     * ทำงานได้ทันทีบน Vercel และทุก Host โดยไม่ต้องผ่านเซิร์ฟเวอร์กลาง
+     */
+    async function fetchSheetData(sheetName) {
+      try {
+        const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
+        const resp = await fetch(url);
+        const text = await resp.text();
+        const jsonStr = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+        const json = JSON.parse(jsonStr);
+        if (!json.table || !json.table.rows) return [];
+        return json.table.rows.map(r => {
+          if (!r || !r.c) return [];
+          return r.c.map(cell => (cell && cell.v !== null && cell.v !== undefined) ? String(cell.v).trim() : '');
+        });
+      } catch (e) {
+        console.error("Fetch Sheet Error:", sheetName, e);
+        return [];
+      }
+    }
+
+    /**
      * Unified Backend Bridge:
      * รันผ่าน google.script.run เมื่ออยู่ใน GAS หรือ fetch API เมื่อรันบน Vercel/GitHub
      */
@@ -630,8 +654,8 @@
             .withSuccessHandler(res => resolve(res))
             .withFailureHandler(err => reject(err))
             [actionName](payload);
-        } else {
-          // โหมด External Hosting (Vercel / GitHub Pages)
+        } else if (GAS_API_URL && !GAS_API_URL.includes("Example")) {
+          // โหมด External Hosting (Vercel) ที่ผูก Web App URL แล้ว
           const dataToSend = { action: actionName, ...payload };
           fetch(GAS_API_URL, {
             method: 'POST',
@@ -641,16 +665,19 @@
           })
           .then(r => r.json())
           .then(res => resolve(res))
-          .catch(err => {
-            console.warn("API call fallback or offline:", err);
-            reject(err);
+          .catch(err => reject(err));
+        } else {
+          // Fallback message สำหรับฟังก์ชันที่ต้องเขียนข้อมูล
+          resolve({ 
+            success: false, 
+            message: "กรุณาระบุ Google Apps Script Web App URL เพื่อเปิดใช้งานฟังก์ชันบันทึกข้อมูลและส่งอีเมล" 
           });
         }
       });
     }
 
-    // เข้าสู่ระบบ
-    function handleLogin(e) {
+    // เข้าสู่ระบบ (รองรับทั้ง Apps Script และ Live Google Sheets Direct Reader)
+    async function handleLogin(e) {
       e.preventDefault();
       const u = document.getElementById('loginUser').value.trim();
       const p = document.getElementById('loginPass').value.trim();
@@ -665,9 +692,59 @@
           .withFailureHandler(err => handleLoginError(err, btn))
           .loginUser(u, p);
       } else {
-        callBackend('login', { username: u, password: p })
-          .then(res => handleLoginResponse(res, btn))
-          .catch(err => handleLoginError(err, btn));
+        // Direct Live Check จาก Google Sheets แท็บ Users
+        try {
+          const rows = await fetchSheetData('Users');
+          let matched = null;
+
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const username = (row[0] || '').trim();
+            const password = (row[1] || '').trim();
+            const role = (row[2] || 'teacher').trim();
+            const fullName = (row[3] || '').trim();
+            const schoolName = (row[4] || '').trim();
+            const subjectGroup = (row[5] || '').trim();
+            const email = (row[6] || '').trim();
+            const status = (row[7] || 'Active').trim();
+
+            if (username.toLowerCase() === u.toLowerCase()) {
+              // ตรวจสอบรหัสผ่าน: ถ้ารหัสผ่านใน Sheet เป็นค่าว่าง ให้ใช้รหัสเริ่มต้น '1234' หรือยอมรับถ้ารหัสตรง
+              const effectivePass = password === "" ? "1234" : password;
+              
+              if (effectivePass === p || (password === "" && p === "1234")) {
+                if (status.toLowerCase() === 'inactive') {
+                  handleLoginResponse({ success: false, message: "บัญชีนี้ถูกระงับการใช้งานชั่วคราว" }, btn);
+                  return;
+                }
+                matched = {
+                  username: username,
+                  role: role,
+                  fullName: fullName,
+                  schoolName: schoolName,
+                  subjectGroup: subjectGroup,
+                  email: email,
+                  isDefaultPass: (effectivePass === "1234" || password === "")
+                };
+                break;
+              } else if (password === "" && p !== "1234") {
+                handleLoginResponse({ 
+                  success: false, 
+                  message: "บัญชีนี้ใน Google Sheets ยังไม่ได้ตั้งรหัสผ่าน (สามารถใช้รหัสเริ่มต้น 1234 เพื่อเข้าสู่ระบบได้)" 
+                }, btn);
+                return;
+              }
+            }
+          }
+
+          if (matched) {
+            handleLoginResponse({ success: true, user: matched }, btn);
+          } else {
+            handleLoginResponse({ success: false, message: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง โปรดตรวจสอบอีกครั้ง" }, btn);
+          }
+        } catch (err) {
+          handleLoginError(err, btn);
+        }
       }
     }
 
@@ -816,25 +893,112 @@
       }
     }
 
-    function loadSystemData() {
-      const handleData = (res) => {
-        if (res && res.success) {
-          systemData = res;
-          updateDashboardStats();
-          renderTasks(res.assignments);
-          renderSubmissions(res.submissions);
-          renderResources(res.resources);
-          renderQA(res.qaBoard);
-        }
-      };
-
+    async function loadSystemData() {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
-          .withSuccessHandler(handleData)
+          .withSuccessHandler(res => {
+            if (res && res.success) {
+              systemData = res;
+              updateDashboardStats();
+              renderTasks(res.assignments);
+              renderSubmissions(res.submissions);
+              renderResources(res.resources);
+              renderQA(res.qaBoard);
+            }
+          })
           .getInitialData(currentUser.username, currentUser.role);
       } else {
-        callBackend('getInitialData', { username: currentUser.username, role: currentUser.role })
-          .then(handleData);
+        // Direct Live Sheet Reader จากแท็บต่าง ๆ บน Vercel
+        try {
+          const [assignRows, subRows, resRows, qaRows] = await Promise.all([
+            fetchSheetData('Assignments'),
+            fetchSheetData('Submissions'),
+            fetchSheetData('Resources'),
+            fetchSheetData('QA_Board')
+          ]);
+
+          // 1. ภารกิจ (Assignments)
+          const assignments = assignRows.filter(r => r[0]).map(r => ({
+            id: r[0],
+            title: r[1] || '',
+            description: r[2] || '',
+            dueDate: r[3] || '',
+            templateLink: r[4] || '',
+            status: r[5] || 'Open'
+          }));
+
+          // 2. ส่งงาน (Submissions)
+          const isTeacher = (currentUser.role === 'teacher');
+          const submissions = [];
+          for (let i = 0; i < subRows.length; i++) {
+            const r = subRows[i];
+            if (!r[0]) continue;
+            if (isTeacher && (r[2] || '').trim() !== currentUser.username.trim()) {
+              continue;
+            }
+            submissions.push({
+              rowId: i + 2,
+              submissionId: r[0],
+              timestamp: r[1] || '-',
+              username: r[2] || '',
+              teacherName: r[3] || '',
+              schoolName: r[4] || '',
+              assignmentId: r[5] || '',
+              researchTitle: r[6] || '',
+              fileLink: r[7] || '',
+              teacherReflection: r[8] || '',
+              status: r[9] || 'รอตรวจ',
+              supervisorComment: r[10] || '',
+              feedbackDate: r[11] || '-'
+            });
+          }
+
+          // 3. คลังสื่อ (Resources)
+          const resources = resRows.filter(r => r[0]).map(r => ({
+            id: r[0],
+            category: r[1] || 'ทั่วไป',
+            title: r[2] || '',
+            description: r[3] || '',
+            fileLink: r[4] || '',
+            thumbnailUrl: r[5] || '',
+            updatedDate: r[6] || ''
+          }));
+
+          // 4. คลินิกวิจัย (QA_Board)
+          const qaBoard = [];
+          for (let i = 0; i < qaRows.length; i++) {
+            const r = qaRows[i];
+            if (!r[0]) continue;
+            qaBoard.push({
+              rowId: i + 2,
+              postId: r[0],
+              timestamp: r[1] || '-',
+              username: r[2] || '',
+              teacherName: r[3] || '',
+              schoolName: r[4] || '',
+              topic: r[5] || '',
+              detail: r[6] || '',
+              answer: r[7] || '',
+              answeredBy: r[8] || '',
+              status: r[9] || 'รอตอบ'
+            });
+          }
+
+          systemData = {
+            assignments: assignments,
+            submissions: submissions.reverse(),
+            resources: resources,
+            qaBoard: qaBoard.reverse()
+          };
+
+          updateDashboardStats();
+          renderTasks(systemData.assignments);
+          renderSubmissions(systemData.submissions);
+          renderResources(systemData.resources);
+          renderQA(systemData.qaBoard);
+        } catch (err) {
+          console.error("Error loading live system data:", err);
+        }
       }
     }
 
