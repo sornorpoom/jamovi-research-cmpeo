@@ -43,6 +43,7 @@
   </script>
 
   <style>
+    html { font-size: 108%; } /* ปรับขนาดตัวอักษรให้อ่านง่าย ชัดเจนขึ้น 8% */
     body { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; }
     .font-display { font-family: 'Prompt', sans-serif; }
     .glass-nav { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); }
@@ -81,7 +82,13 @@
       </div>
 
       <!-- สิทธิ์ / ผู้ใช้งาน & ปุ่มออกจากระบบ -->
-      <div id="userInfoHeader" class="hidden flex items-center space-x-2 sm:space-x-3">
+      <div id="userInfoHeader" class="hidden flex items-center space-x-2 sm:space-x-2.5">
+        <button onclick="manualRefreshData()" id="btnRefreshData" title="รีเฟรชและซิงค์ข้อมูลกับ Google Sheet แบบ Real-time" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold bg-emerald-600/25 hover:bg-emerald-600/35 text-emerald-300 border border-emerald-400/50 rounded-xl transition shadow-sm cursor-pointer">
+          <i id="refreshIcon" class="fa-solid fa-arrows-rotate text-emerald-400"></i> <span class="hidden sm:inline">รีเฟรชข้อมูล</span>
+        </button>
+        <a href="https://docs.google.com/spreadsheets/d/1Aw6biBPPJ-JYfU-wNRRsVW8JS8Hop_BmdywBXqSCw-Q/edit?usp=sharing" target="_blank" title="เปิด Google Sheets ฐานข้อมูลแบบสด" class="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-green-800/40 hover:bg-green-700/50 text-green-200 border border-green-600/50 rounded-xl transition">
+          <i class="fa-solid fa-table text-emerald-400"></i> Google Sheet
+        </a>
         <button onclick="promptForGasUrl()" id="btnGasConfig" title="ตั้งค่าเชื่อมต่อ Google Apps Script Web App" class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl transition">
           <i class="fa-solid fa-plug text-emerald-400"></i> <span class="hidden md:inline">เชื่อมต่อ Apps Script</span>
         </button>
@@ -151,7 +158,7 @@
 
       <div class="mt-6 pt-5 border-t border-slate-100 text-center">
         <p class="text-[11px] text-slate-400">
-          มีปัญหาการเข้าสู่ระบบ ติดต่อ ศน.รัชภูมิ สมสมัย โทร. 085-6536564
+          มีปัญหาการเข้าสู่ระบบ แจ้งอีเมลมาที่ <a href="mailto:sornorpoom@gmail.com" class="text-blue-600 font-semibold hover:underline">sornorpoom@gmail.com</a> (ศน.รัชภูมิ สมสมัย)
         </p>
       </div>
     </div>
@@ -602,7 +609,7 @@
   <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
     <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
       <p>กลุ่มนิเทศ ติดตามและประเมินผล สำนักงานศึกษาธิการจังหวัดเชียงใหม่</p>
-      <p class="text-[11px] text-slate-400">ผู้ประสานงาน: ศน.รัชภูมิ สมสมัย โทร. 085-6536564</p>
+      <p class="text-[11px] text-slate-400">ผู้ประสานงาน: ศน.รัชภูมิ สมสมัย (อีเมล: <a href="mailto:sornorpoom@gmail.com" class="text-blue-600 font-medium hover:underline">sornorpoom@gmail.com</a>)</p>
     </div>
   </footer>
 
@@ -647,6 +654,46 @@
         return [];
       }
     }
+
+    /**
+     * 🔄 ฟังก์ชันรีเฟรชข้อมูลแบบ Real-time และซิงค์ตรงกับ Google Sheets
+     */
+    let isRefreshing = false;
+    async function manualRefreshData(silent = false) {
+      if (isRefreshing || !currentUser) return;
+      isRefreshing = true;
+      const icon = document.getElementById('refreshIcon');
+      if (icon) icon.classList.add('fa-spin');
+
+      try {
+        await loadSystemData();
+        if (!silent) {
+          const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2200,
+            timerProgressBar: true
+          });
+          Toast.fire({
+            icon: 'success',
+            title: 'ซิงค์ข้อมูลล่าสุดกับ Google Sheets สำเร็จ'
+          });
+        }
+      } catch (err) {
+        console.error("Manual refresh error:", err);
+      } finally {
+        isRefreshing = false;
+        if (icon) icon.classList.remove('fa-spin');
+      }
+    }
+
+    // ⏱️ Real-time Auto-Sync ซิงค์ข้อมูลกับ Google Sheet ในเบื้องหลังอัตโนมัติทุก 20 วินาที
+    setInterval(() => {
+      if (currentUser && document.getElementById('portalSection') && !document.getElementById('portalSection').classList.contains('hidden')) {
+        manualRefreshData(true);
+      }
+    }, 20000);
 
     /**
      * Unified Backend Bridge:
