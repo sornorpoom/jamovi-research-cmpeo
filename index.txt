@@ -287,29 +287,29 @@
           <form onsubmit="handleCreateAssignment(event)" class="space-y-3.5 text-xs sm:text-sm">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label class="block font-semibold text-slate-700 mb-1">รหัสภารกิจ (assignment_id) <span class="text-rose-600">*</span></label>
-                <input type="text" id="newTaskAssignmentId" required placeholder="เช่น TASK-01" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+                <label class="block font-semibold text-slate-700 mb-1">รหัสภารกิจ (assignment_id)</label>
+                <select id="newTaskAssignmentId" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-blue-600 outline-none font-semibold text-blue-900"></select>
               </div>
               <div>
-                <label class="block font-semibold text-slate-700 mb-1">สถานะภารกิจ (status) <span class="text-rose-600">*</span></label>
-                <select id="newTaskStatus" required class="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-blue-600 outline-none">
+                <label class="block font-semibold text-slate-700 mb-1">สถานะภารกิจ (status)</label>
+                <select id="newTaskStatus" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-blue-600 outline-none">
                   <option value="Open">Open (เปิดรับงาน)</option>
                   <option value="Closed">Closed (ปิดรับงาน)</option>
                 </select>
               </div>
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">ชื่อภารกิจ (title) <span class="text-rose-600">*</span></label>
-              <input type="text" id="newTaskTitle" required placeholder="เช่น ส่งเค้าโครงการวิจัยและไฟล์สถิติ Jamovi (.omv)" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+              <label class="block font-semibold text-slate-700 mb-1">ชื่อภารกิจ (title)</label>
+              <input type="text" id="newTaskTitle" placeholder="เช่น ส่งเค้าโครงการวิจัยและไฟล์สถิติ Jamovi (.omv)" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">คำชี้แจงรายละเอียดภารกิจ (description) <span class="text-rose-600">*</span></label>
-              <textarea id="newTaskDescription" rows="3" required placeholder="ระบุเกณฑ์การจัดทำ ข้อกำหนด และสิ่งที่ต้องส่ง..." class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none"></textarea>
+              <label class="block font-semibold text-slate-700 mb-1">คำชี้แจงรายละเอียดภารกิจ (description)</label>
+              <textarea id="newTaskDescription" rows="3" placeholder="ระบุเกณฑ์การจัดทำ ข้อกำหนด และสิ่งที่ต้องส่ง..." class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none"></textarea>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label class="block font-semibold text-slate-700 mb-1">กำหนดส่ง (due_date) <span class="text-rose-600">*</span></label>
-                <input type="text" id="newTaskDueDate" required placeholder="เช่น 31 ตุลาคม 2569" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 outline-none">
+                <label class="block font-semibold text-slate-700 mb-1">กำหนดส่ง (due_date)</label>
+                <input type="date" id="newTaskDueDate" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-blue-600 outline-none cursor-pointer">
               </div>
               <div>
                 <label class="block font-semibold text-slate-700 mb-1">ลิงก์ตัวอย่าง/เทมเพลต (template_link)</label>
@@ -1064,7 +1064,53 @@
       document.getElementById('statQA').textContent = (systemData.qaBoard || []).length;
     }
 
-    function openNewAssignmentModal() { document.getElementById('newAssignmentModal').classList.remove('hidden'); }
+    function formatThaiDate(dateStr) {
+      if (!dateStr) return '';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+      const parts = dateStr.split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      const thaiMonths = [
+        'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+        'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+      ];
+      const thaiYear = y + 543;
+      return `${d} ${thaiMonths[m]} ${thaiYear}`;
+    }
+
+    function openNewAssignmentModal() {
+      // Auto-generate dropdown TASK-01 to TASK-20
+      const select = document.getElementById('newTaskAssignmentId');
+      select.innerHTML = '';
+      
+      const existingTasks = (systemData.assignments || []).map(a => (a.id || '').toUpperCase().replace(/\s+/g, '-'));
+      let nextTaskNum = 1;
+      while (existingTasks.includes(`TASK-${String(nextTaskNum).padStart(2, '0')}`) || existingTasks.includes(`TASK${String(nextTaskNum).padStart(2, '0')}`)) {
+        nextTaskNum++;
+      }
+
+      for (let i = 1; i <= 20; i++) {
+        const taskId = `TASK-${String(i).padStart(2, '0')}`;
+        const opt = document.createElement('option');
+        opt.value = taskId;
+        opt.textContent = `${taskId} (${taskId.replace('-', ' ')})`;
+        if (i === nextTaskNum) {
+          opt.selected = true;
+        }
+        select.appendChild(opt);
+      }
+
+      // Default date to 30 days from now if not set
+      if (!document.getElementById('newTaskDueDate').value) {
+        const today = new Date();
+        today.setDate(today.getDate() + 30);
+        document.getElementById('newTaskDueDate').value = today.toISOString().split('T')[0];
+      }
+
+      document.getElementById('newAssignmentModal').classList.remove('hidden');
+    }
+
     function closeNewAssignmentModal() { document.getElementById('newAssignmentModal').classList.add('hidden'); }
 
     function handleCreateAssignment(e) {
@@ -1073,13 +1119,16 @@
       btn.disabled = true;
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึกและส่งอีเมลแจ้งครู...';
 
+      const rawDueDate = document.getElementById('newTaskDueDate').value;
+      const formattedDueDate = formatThaiDate(rawDueDate);
+
       const payload = {
-        assignment_id: document.getElementById('newTaskAssignmentId').value.trim(),
-        title: document.getElementById('newTaskTitle').value.trim(),
-        description: document.getElementById('newTaskDescription').value.trim(),
-        due_date: document.getElementById('newTaskDueDate').value.trim(),
+        assignment_id: document.getElementById('newTaskAssignmentId').value.trim() || 'TASK-01',
+        title: document.getElementById('newTaskTitle').value.trim() || 'ภารกิจการวิจัยในชั้นเรียน',
+        description: document.getElementById('newTaskDescription').value.trim() || '-',
+        due_date: formattedDueDate || '-',
         template_link: document.getElementById('newTaskTemplateLink').value.trim(),
-        status: document.getElementById('newTaskStatus').value
+        status: document.getElementById('newTaskStatus').value || 'Open'
       };
 
       const afterCreate = (res) => {
@@ -1088,7 +1137,6 @@
         if (res.success) {
           Swal.fire({ icon: 'success', title: 'เพิ่มภารกิจสำเร็จ', text: res.message, confirmButtonColor: '#0f172a' });
           closeNewAssignmentModal();
-          document.getElementById('newTaskAssignmentId').value = '';
           document.getElementById('newTaskTitle').value = '';
           document.getElementById('newTaskDescription').value = '';
           document.getElementById('newTaskDueDate').value = '';
@@ -1106,59 +1154,109 @@
       }
     }
 
-    function openNewResourceModal() { document.getElementById('newResourceModal').classList.remove('hidden'); }
-    function closeNewResourceModal() { document.getElementById('newResourceModal').classList.add('hidden'); }
-
-    function handleCreateResource(e) {
-      e.preventDefault();
-      const btn = document.getElementById('btnSubmitNewRes');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...';
-
-      const payload = {
-        resource_id: document.getElementById('newResId').value.trim(),
-        category: document.getElementById('newResCategory').value.trim(),
-        title: document.getElementById('newResTitle').value.trim(),
-        description: document.getElementById('newResDesc').value.trim(),
-        file_link: document.getElementById('newResLink').value.trim(),
-        thumbnail_url: document.getElementById('newResThumb').value.trim(),
-        updated_date: document.getElementById('newResDate').value.trim()
-      };
-
-      const afterRes = (res) => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> บันทึกข้อมูลลงคลังสื่อ';
-        if (res.success) {
-          Swal.fire({ icon: 'success', title: 'สำเร็จ', text: res.message, confirmButtonColor: '#0f172a' });
-          closeNewResourceModal();
-          document.getElementById('newResId').value = '';
-          document.getElementById('newResCategory').value = '';
-          document.getElementById('newResTitle').value = '';
-          document.getElementById('newResDesc').value = '';
-          document.getElementById('newResLink').value = '';
-          document.getElementById('newResThumb').value = '';
-          document.getElementById('newResDate').value = '';
-          loadSystemData();
-        } else {
-          Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: res.message, confirmButtonColor: '#0f172a' });
-        }
-      };
-
-      if (typeof google !== 'undefined' && google.script && google.script.run) {
-        google.script.run.withSuccessHandler(afterRes).createResource(payload);
-      } else {
-        callBackend('createResource', payload).then(afterRes);
-      }
-    }
-
     function renderTasks(tasks) {
       const container = document.getElementById('assignmentCards');
       if (!tasks || tasks.length === 0) {
         container.innerHTML = '<div class="col-span-2 text-center py-10 text-slate-400 bg-white rounded-3xl border border-dashed border-slate-300">ยังไม่มีภารกิจที่มอบหมายในขณะนี้</div>';
         return;
       }
+
+      const isTeacher = (currentUser && currentUser.role === 'teacher');
+      const allSubmissions = systemData.submissions || [];
+
       container.innerHTML = tasks.map(t => {
         const isOpen = (t.status || '').toLowerCase() === 'open';
+        
+        // Find teacher submission for this task
+        let mySub = null;
+        if (isTeacher) {
+          mySub = allSubmissions.find(s => 
+            (s.assignmentId || '').trim().toUpperCase() === (t.id || '').trim().toUpperCase() && 
+            (s.username || '').trim().toLowerCase() === (currentUser.username || '').trim().toLowerCase()
+          );
+        }
+
+        let actionHtml = '';
+        let statusBadgeHtml = '';
+
+        if (isTeacher) {
+          if (mySub) {
+            const st = (mySub.status || '').trim();
+            if (st === 'ผ่านการนิเทศ') {
+              statusBadgeHtml = `
+                <div class="mt-3 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between">
+                  <span class="font-semibold flex items-center gap-1.5"><i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i> ส่งแล้ว (ตรวจงานแล้ว: ผ่านการนิเทศ)</span>
+                  <span class="text-[11px] text-emerald-600 font-medium">${mySub.feedbackDate || mySub.timestamp || ''}</span>
+                </div>
+              `;
+              actionHtml = `
+                <div class="flex items-center gap-2">
+                  ${mySub.fileLink ? `<a href="${mySub.fileLink}" target="_blank" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition flex items-center gap-1"><i class="fa-solid fa-file-lines"></i> ดูไฟล์ที่ส่ง</a>` : ''}
+                  <button onclick="switchTab('tab-submissions')" class="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow transition flex items-center gap-1">
+                    <i class="fa-solid fa-comments"></i> ดูผลการนิเทศ
+                  </button>
+                </div>
+              `;
+            } else if (st === 'ปรับปรุงแก้ไข') {
+              statusBadgeHtml = `
+                <div class="mt-3 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between">
+                  <span class="font-semibold flex items-center gap-1.5"><i class="fa-solid fa-triangle-exclamation text-rose-600 text-sm"></i> ส่งแล้ว (ตรวจงานแล้ว: ต้องปรับปรุงแก้ไข)</span>
+                  <span class="text-[11px] text-rose-600 font-medium">${mySub.feedbackDate || mySub.timestamp || ''}</span>
+                </div>
+              `;
+              actionHtml = `
+                <div class="flex items-center gap-2">
+                  <button onclick="openResubmitModal(${mySub.rowId}, '${(mySub.researchTitle || '').replace(/'/g, "\\'")}', '${mySub.fileLink || ''}')" class="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrows-rotate"></i> ส่งฉบับแก้ไข
+                  </button>
+                  <button onclick="switchTab('tab-submissions')" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition flex items-center gap-1">
+                    <i class="fa-solid fa-comments"></i> ดูข้อเสนอแนะ
+                  </button>
+                </div>
+              `;
+            } else {
+              // 'รอตรวจ' or 'รอตรวจ (ส่งแก้ไขแล้ว)' or 'กำลังนิเทศ'
+              statusBadgeHtml = `
+                <div class="mt-3 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between">
+                  <span class="font-semibold flex items-center gap-1.5"><i class="fa-solid fa-clock-rotate-left text-amber-600 text-sm"></i> ส่งแล้ว (รอการตรวจ)</span>
+                  <span class="text-[11px] text-amber-700 font-medium">${mySub.timestamp || ''}</span>
+                </div>
+              `;
+              actionHtml = `
+                <div class="flex items-center gap-2">
+                  ${mySub.fileLink ? `<a href="${mySub.fileLink}" target="_blank" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition flex items-center gap-1"><i class="fa-solid fa-file-lines"></i> ดูไฟล์ที่ส่ง</a>` : ''}
+                  <button onclick="switchTab('tab-submissions')" class="px-3 py-1.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-white text-xs font-semibold shadow transition flex items-center gap-1">
+                    <i class="fa-solid fa-list-check"></i> ติดตามผล
+                  </button>
+                </div>
+              `;
+            }
+          } else {
+            // Teacher hasn't submitted yet
+            if (isOpen) {
+              actionHtml = `
+                <button onclick="openSubmitForm('${t.id}', '${(t.title || '').replace(/'/g, "\\'")}')" class="px-4 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-white text-xs font-semibold shadow transition flex items-center gap-1.5">
+                  <i class="fa-solid fa-cloud-arrow-up"></i> ส่งงานภารกิจนี้
+                </button>
+              `;
+            } else {
+              actionHtml = `<span class="text-xs text-slate-400 font-semibold"><i class="fa-solid fa-lock"></i> ปิดรับงานแล้ว</span>`;
+            }
+          }
+        } else {
+          // Supervisor / Admin view
+          const taskSubs = allSubmissions.filter(s => (s.assignmentId || '').trim().toUpperCase() === (t.id || '').trim().toUpperCase());
+          const taskPassed = taskSubs.filter(s => s.status === 'ผ่านการนิเทศ').length;
+          actionHtml = `
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-500 font-medium">ส่งแล้ว <strong class="text-blue-900">${taskSubs.length}</strong> คน (ผ่าน ${taskPassed})</span>
+              <button onclick="switchTab('tab-submissions')" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition flex items-center gap-1">
+                <i class="fa-solid fa-clipboard-check"></i> ตรวจงาน
+              </button>
+            </div>
+          `;
+        }
+
         return `
           <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between card-academic">
             <div>
@@ -1173,14 +1271,11 @@
               </div>
               <h4 class="text-sm sm:text-base font-bold text-slate-900 leading-snug">${t.title}</h4>
               <p class="text-xs text-slate-600 mt-2 whitespace-pre-line leading-relaxed">${t.description || '-'}</p>
+              ${statusBadgeHtml}
             </div>
-            <div class="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between">
+            <div class="mt-5 pt-3.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
               ${t.templateLink ? `<a href="${t.templateLink}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline flex items-center gap-1"><i class="fa-solid fa-file-arrow-down"></i> เอกสารตัวอย่าง / Template</a>` : `<span></span>`}
-              ${isOpen ? `
-                <button onclick="openSubmitForm('${t.id}', '${t.title}')" class="px-4 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-white text-xs font-semibold shadow transition flex items-center gap-1.5">
-                  <i class="fa-solid fa-cloud-arrow-up"></i> ส่งงานภารกิจนี้
-                </button>
-              ` : `<span class="text-xs text-slate-400 font-semibold">ปิดรับงานแล้ว</span>`}
+              <div>${actionHtml}</div>
             </div>
           </div>
         `;
@@ -1416,6 +1511,51 @@
         google.script.run.withSuccessHandler(afterResub).resubmitAssignment(payload);
       } else {
         callBackend('resubmitAssignment', payload).then(afterResub);
+      }
+    }
+
+    function openNewResourceModal() { document.getElementById('newResourceModal').classList.remove('hidden'); }
+    function closeNewResourceModal() { document.getElementById('newResourceModal').classList.add('hidden'); }
+
+    function handleCreateResource(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSubmitNewRes');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...';
+
+      const payload = {
+        resource_id: document.getElementById('newResId').value.trim(),
+        category: document.getElementById('newResCategory').value.trim(),
+        title: document.getElementById('newResTitle').value.trim(),
+        description: document.getElementById('newResDesc').value.trim(),
+        file_link: document.getElementById('newResLink').value.trim(),
+        thumbnail_url: document.getElementById('newResThumb').value.trim(),
+        updated_date: document.getElementById('newResDate').value.trim()
+      };
+
+      const afterRes = (res) => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> บันทึกข้อมูลลงคลังสื่อ';
+        if (res.success) {
+          Swal.fire({ icon: 'success', title: 'สำเร็จ', text: res.message, confirmButtonColor: '#0f172a' });
+          closeNewResourceModal();
+          document.getElementById('newResId').value = '';
+          document.getElementById('newResCategory').value = '';
+          document.getElementById('newResTitle').value = '';
+          document.getElementById('newResDesc').value = '';
+          document.getElementById('newResLink').value = '';
+          document.getElementById('newResThumb').value = '';
+          document.getElementById('newResDate').value = '';
+          loadSystemData();
+        } else {
+          Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: res.message, confirmButtonColor: '#0f172a' });
+        }
+      };
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run.withSuccessHandler(afterRes).createResource(payload);
+      } else {
+        callBackend('createResource', payload).then(afterRes);
       }
     }
 
